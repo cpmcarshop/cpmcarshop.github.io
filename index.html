@@ -54,9 +54,43 @@
 
     /* 通知バッジ */
     .notif-box { background: #1f4068; border-left: 4px solid var(--main-color); padding: 12px; margin-bottom: 10px; border-radius: 4px; }
+
+    /* 全局ローディングオーバーレイ UI */
+    #global-loading {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(10, 12, 27, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: var(--main-color);
+      font-weight: bold;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(0, 210, 255, 0.2);
+      border-top-color: var(--main-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 15px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
+
+  <!-- ローディング表示用要素 -->
+  <div id="global-loading">
+    <div class="spinner"></div>
+    <div id="loading-text">データを読み込み中...</div>
+  </div>
 
   <header>
     <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
@@ -230,14 +264,14 @@
     import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     // Firebase 設定
-const firebaseConfig = {
-  apiKey: "AIzaSyCffFYNOEcrGu2GKgSiE6q6KgGkCtxJEFw",
-  authDomain: "kakuusha-gai.firebaseapp.com",
-  projectId: "kakuusha-gai",
-  storageBucket: "kakuusha-gai.firebasestorage.app",
-  messagingSenderId: "460103021741",
-  appId: "1:460103021741:web:40ed966e261ed657e80224"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyCffFYNOEcrGu2GKgSiE6q6KgGkCtxJEFw",
+      authDomain: "kakuusha-gai.firebaseapp.com",
+      projectId: "kakuusha-gai",
+      storageBucket: "kakuusha-gai.firebasestorage.app",
+      messagingSenderId: "460103021741",
+      appId: "1:460103021741:web:40ed966e261ed657e80224"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -270,8 +304,30 @@ const firebaseConfig = {
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzMJPFaZ-oiSNM07acRwMvbUlUdOw1adMg4Km4Ir5GsOX4KTU2KdZin-mIpq-C0QBEd3g/exec"; // GASのWebアプリURL
 
-    // API通信共通関数
+    // ローディング状態管理カウンター
+    let activeApiRequests = 0;
+
+    function showLoading(text = "データを処理中...") {
+      activeApiRequests++;
+      const loadingEl = document.getElementById('global-loading');
+      if (loadingEl) {
+        document.getElementById('loading-text').innerText = text;
+        loadingEl.style.display = 'flex';
+      }
+    }
+
+    function hideLoading() {
+      activeApiRequests--;
+      if (activeApiRequests <= 0) {
+        activeApiRequests = 0;
+        const loadingEl = document.getElementById('global-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+      }
+    }
+
+    // API通信共通関数（ローディング制御追加）
     async function callGasApi(action, payload = {}) {
+      showLoading("サーバーと通信中...");
       try {
         const res = await fetch(GAS_URL, {
           method: 'POST',
@@ -284,6 +340,8 @@ const firebaseConfig = {
       } catch (e) {
         alert("APIエラー: " + e.message);
         return null;
+      } finally {
+        hideLoading();
       }
     }
 
@@ -365,7 +423,7 @@ const firebaseConfig = {
       const grid = document.getElementById('maker-grid');
       grid.innerHTML = (makers || []).map(m => `
         <div class="card">
-          <img src="${m.headerUrl || 'https://via.placeholder.com/300x100'}" class="card-img" style="height:100px;">
+          <img src="${m.headerUrl || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
           <div class="card-body">
             <h3 class="card-title">${m.makerName}</h3>
             <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
@@ -494,7 +552,7 @@ const firebaseConfig = {
 
       statusArea.innerHTML = `
         <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
-          <img src="${maker.iconUrl || 'https://via.placeholder.com/80'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
+          <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
           <div>
             <h3>${maker.makerName}</h3>
             <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
