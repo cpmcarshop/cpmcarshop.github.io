@@ -649,7 +649,7 @@ const firebaseConfig = {
         grades: grades, colors: colors, options: options
       };
 
-      const res = await callApi('saveCar', payload);
+      const res = await callgasApi('saveCar', payload);
       if (res) {
         alert(res.message);
         closeModal('car-modal');
