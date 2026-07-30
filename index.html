@@ -268,7 +268,7 @@ const firebaseConfig = {
   </script>
 
   <script>
-    const GAS_URL = "YOUR_GAS_DEPLOYED_WEB_APP_URL"; // GASのWebアプリURL
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzMJPFaZ-oiSNM07acRwMvbUlUdOw1adMg4Km4Ir5GsOX4KTU2KdZin-mIpq-C0QBEd3g/exec"; // GASのWebアプリURL
 
     // API通信共通関数
     async function callGasApi(action, payload = {}) {
@@ -649,7 +649,7 @@ const firebaseConfig = {
         grades: grades, colors: colors, options: options
       };
 
-      const res = await callGasApi('saveCar', payload);
+      const res = await callApi('saveCar', payload);
       if (res) {
         alert(res.message);
         closeModal('car-modal');
