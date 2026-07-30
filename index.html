@@ -255,7 +255,7 @@ const firebaseConfig = {
         document.getElementById('auth-btn').innerText = 'ログアウト';
         document.getElementById('mypage-tab').style.display = 'block';
         
-        // GASへユーザー情報同期
+        // へユーザー情報同期
         await callGasApi('registerUser', { uid: user.uid, name: user.displayName || 'ユーザー', username: user.email.split('@')[0], email: user.email });
         loadMypageData();
       } else {
@@ -380,7 +380,7 @@ const firebaseConfig = {
       grid.innerHTML = cars.map(c => `
         <div class="card">
           <span class="card-badge">${c.status}</span>
-          <img src="${c.img1 || 'https://via.placeholder.com/300x160?text=No+Image'}" class="card-img">
+          <img src="${c.img1 || 'https://placehold.co/300x160?text=No+Image'}" class="card-img">
           <div class="card-body">
             <div class="card-subtitle">${c.makerName}</div>
             <h3 class="card-title">${c.carName}</h3>
@@ -649,7 +649,7 @@ const firebaseConfig = {
         grades: grades, colors: colors, options: options
       };
 
-      const res = await callgasApi('saveCar', payload);
+      const res = await callGasApi('saveCar', payload);
       if (res) {
         alert(res.message);
         closeModal('car-modal');
