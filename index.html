@@ -638,6 +638,27 @@ async function loadHomeCars(force = false) {
     renderCarGrid('home-car-grid', cars);
   }
 }
+
+    // 検索実行
+async function executeSearch() {
+  const keyword = document.getElementById('search-keyword').value;
+  const genre = document.getElementById('search-genre').value;
+  const filter = { keyword: keyword, genre: genre };
+  if (currentSelectedMakerId) {
+    filter.makerId = currentSelectedMakerId;
+  }
+  const cars = await callGasApi('getCars', filter);
+  const grid = document.getElementById('search-car-grid');
+  
+  if (cars === null) {
+    grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">検索結果の読み込みに失敗しました。</p>`;
+  } else if (cars.length === 0) {
+    grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">該当する車両はありません。</p>`;
+  } else {
+    // 検索結果はランキング表示なし（showRank = false）
+    renderCarGrid('search-car-grid', cars, false, false);
+  }
+}
     // メーカー指定で車両一覧を表示する（メーカー一覧クリック時）
     function filterByMaker(makerId, makerName) {
       currentSelectedMakerId = makerId;
