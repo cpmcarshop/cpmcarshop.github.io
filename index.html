@@ -236,25 +236,32 @@
       <div id="home-car-grid" class="card-grid"></div>
     </main>
 
-    <!-- 2. 車両検索タブ -->
-    <main id="search" class="tab-content">
-      <h2 id="search-title">架空車 総合検索</h2>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
-        <input type="text" id="search-keyword" placeholder="車両名・キーワードを入力..." style="flex:2; padding: 10px; background: #16213e; color: #fff; border: 1px solid #333; border-radius: 4px;">
-        <select id="search-genre" style="flex:1; padding: 10px; background: #16213e; color: #fff; border: 1px solid #333; border-radius: 4px;">
-          <option value="all">すべてのジャンル</option>
-          <option value="クーペ">クーペ</option>
-          <option value="セダン">セダン</option>
-          <option value="SUV">SUV</option>
-          <option value="スポーツ">スポーツ</option>
-          <option value="軽トラ/商用">軽トラ/商用</option>
-          <option value="その他">その他</option>
-        </select>
-        <button class="btn" onclick="executeSearch()">検索実行</button>
-        <button class="btn btn-secondary" id="reset-search-btn" onclick="resetSearchFilter()" style="display:none;">フィルター解除</button>
-      </div>
-      <div id="search-car-grid" class="card-grid"></div>
-    </main>
+<!-- 2. 車両検索タブ -->
+<main id="search" class="tab-content">
+  <h2 id="search-title">架空車 総合検索</h2>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+    <input type="text" id="search-keyword" placeholder="車両名・キーワードを入力..." style="flex:2; padding: 10px; background: #16213e; color: #fff; border: 1px solid #333; border-radius: 4px;">
+    <select id="search-genre" style="flex:1; padding: 10px; background: #16213e; color: #fff; border: 1px solid #333; border-radius: 4px;">
+      <option value="all">すべてのジャンル</option>
+      <option value="クーペ">クーペ</option>
+      <option value="セダン">セダン</option>
+      <option value="SUV">SUV</option>
+      <option value="スポーツ">スポーツ</option>
+      <option value="軽トラ/商用">軽トラ/商用</option>
+      <option value="その他">その他</option>
+    </select>
+    <!-- ★ 追加: ソート選択 -->
+    <select id="search-sort" style="flex:1; padding: 10px; background: #16213e; color: #fff; border: 1px solid #333; border-radius: 4px;">
+      <option value="new">新しい順</option>
+      <option value="old">古い順</option>
+      <option value="view">人気順 (視聴数)</option>
+      <option value="sales">販売順 (販売台数)</option>
+    </select>
+    <button class="btn" onclick="executeSearch()">検索実行</button>
+    <button class="btn btn-secondary" id="reset-search-btn" onclick="resetSearchFilter()" style="display:none;">フィルター解除</button>
+  </div>
+  <div id="search-car-grid" class="card-grid"></div>
+</main>
 
     <!-- 3. メーカー一覧タブ -->
     <main id="makers" class="tab-content">
@@ -641,8 +648,11 @@ async function loadHomeCars(force = false) {
   } else {
     renderCarGrid('home-car-grid', cars);
   }
-}
-    // 検索実行
+}// グローバル変数追加（既存のコードの先頭付近に追加）
+let currentSearchResults = [];
+let currentSort = 'new';
+
+// executeSearch 関数を修正
 async function executeSearch() {
   const keyword = document.getElementById('search-keyword').value;
   const genre = document.getElementById('search-genre').value;
@@ -655,29 +665,61 @@ async function executeSearch() {
   
   if (cars === null) {
     grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">検索結果の読み込みに失敗しました。</p>`;
-  } else if (cars.length === 0) {
-    grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">該当する車両はありません。</p>`;
-  } else {
-    // 検索結果はランキング表示なし（showRank = false）
-    renderCarGrid('search-car-grid', cars, false, false);
+    currentSearchResults = [];
+    return;
   }
+  if (cars.length === 0) {
+    grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">該当する車両はありません。</p>`;
+    currentSearchResults = [];
+    return;
+  }
+  currentSearchResults = cars;
+  currentSort = document.getElementById('search-sort').value;
+  applySortAndRender();
 }
-    // メーカー指定で車両一覧を表示する（メーカー一覧クリック時）
-    function filterByMaker(makerId, makerName) {
-      currentSelectedMakerId = makerId;
-      document.getElementById('search-title').innerText = `「${makerName}」の車両一覧`;
-      document.getElementById('reset-search-btn').style.display = 'inline-block';
-      switchTab('search');
-    }
 
-    function resetSearchFilter() {
-      currentSelectedMakerId = null;
-      document.getElementById('search-title').innerText = '架空車 総合検索';
-      document.getElementById('reset-search-btn').style.display = 'none';
-      document.getElementById('search-keyword').value = '';
-      document.getElementById('search-genre').value = 'all';
-      executeSearch();
-    }
+// ソート適用関数（新規追加）
+function applySortAndRender() {
+  if (currentSearchResults.length === 0) return;
+  const sort = currentSort;
+  let sorted = [...currentSearchResults];
+  switch (sort) {
+    case 'new':
+      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      break;
+    case 'old':
+      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      break;
+    case 'view':
+      sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+      break;
+    case 'sales':
+      sorted.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+      break;
+    default:
+      break;
+  }
+  renderCarGrid('search-car-grid', sorted, false, false);
+}
+
+// resetSearchFilter 関数を修正（ソートもリセット）
+function resetSearchFilter() {
+  currentSelectedMakerId = null;
+  document.getElementById('search-title').innerText = '架空車 総合検索';
+  document.getElementById('reset-search-btn').style.display = 'none';
+  document.getElementById('search-keyword').value = '';
+  document.getElementById('search-genre').value = 'all';
+  document.getElementById('search-sort').value = 'new'; // ★追加
+  currentSort = 'new';
+  executeSearch();
+}
+
+// ソート選択変更イベント（新規追加）
+// 既存の <script> 内の適切な場所に追加（document.addEventListener は既に使われているかもしれないので、直接関数を呼ぶ形でもOK）
+document.getElementById('search-sort').addEventListener('change', function() {
+  currentSort = this.value;
+  applySortAndRender();
+});
 
     async function loadRanking() {
   const cars = await callGasApi('getCars', { ranking: true });
