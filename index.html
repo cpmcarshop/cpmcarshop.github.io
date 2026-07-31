@@ -606,9 +606,9 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
 
   
 // ホームタブ読み込み（初期表示用）
+// ホームタブ読み込み（viewCount降順で表示）
 async function loadHomeCars(force = false) {
-  // キャッシュがあればそれを表示（キャッシュがなければAPI呼び出し）
-  const cacheKey = 'getCars{}';
+  const cacheKey = 'getCars{"sortBy":"view"}'; // キャッシュキーを変更
   const cached = apiCache[cacheKey];
   if (!force && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
     console.log('ホーム: キャッシュを使用');
@@ -616,14 +616,12 @@ async function loadHomeCars(force = false) {
     return;
   }
 
-  // 初期ロードフラグを立てる（キャンセルされないように）
   isInitialLoad = true;
-  const cars = await callGasApi('getCars');
+  const cars = await callGasApi('getCars', { sortBy: 'view' }); // ★sortByを指定
   isInitialLoad = false;
   
   const grid = document.getElementById('home-car-grid');
   if (cars === null || cars.length === 0) {
-    // キャッシュがあればそれを使う（バックアップ）
     if (cached && cached.data && cached.data.length > 0) {
       renderCarGrid('home-car-grid', cached.data);
       return;
@@ -638,7 +636,6 @@ async function loadHomeCars(force = false) {
     renderCarGrid('home-car-grid', cars);
   }
 }
-
     // 検索実行
 async function executeSearch() {
   const keyword = document.getElementById('search-keyword').value;
@@ -843,10 +840,26 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
     }
 
     // 車両詳細を開く（カルーセル＋項目画像対応）
-    async function openCarDetail(carId) {
-      const car = await callGasApi('getCarDetail', { carId: carId });
-      if (!car) return;
-      currentCarDetail = car;
+  // 車両詳細を開く（カルーセル＋項目画像対応）
+let viewedCarIds = {}; // セッション中のカウント済み車両IDを保持
+
+async function openCarDetail(carId) {
+  const car = await callGasApi('getCarDetail', { carId: carId });
+  if (!car) return;
+  currentCarDetail = car;
+
+  // ★ 3秒後に視聴数をカウント（まだカウントしていない場合のみ）
+  if (!viewedCarIds[carId]) {
+    viewedCarIds[carId] = true; // すぐにフラグを立てて二重起動を防止
+    setTimeout(async () => {
+      try {
+        await callGasApi('incrementViewCount', { carId: carId });
+        console.log('視聴数カウント: ' + carId);
+      } catch (e) {
+        console.error('視聴数カウントエラー:', e);
+      }
+    }, 3000); // 3秒後
+  }
 
       // 画像リストを構築（img1〜img4 で有効なもの）
       carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
