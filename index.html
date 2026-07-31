@@ -384,22 +384,31 @@
     window.signOut = signOut;
 
     onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        window.currentUser = user;
-        document.getElementById('user-display-name').innerText = user.displayName || user.email;
-        document.getElementById('auth-btn').innerText = 'ログアウト';
-        document.getElementById('mypage-tab').style.display = 'block';
-        
-        // へユーザー情報同期
-        await callGasApi('registerUser', { uid: user.uid, name: user.displayName || 'ユーザー', username: user.email.split('@')[0], email: user.email });
-        loadMypageData();
-      } else {
-        window.currentUser = null;
-        document.getElementById('user-display-name').innerText = '';
-        document.getElementById('auth-btn').innerText = 'ログイン / 登録';
-        document.getElementById('mypage-tab').style.display = 'none';
-      }
-    });
+  if (user) {
+    window.currentUser = user;
+    document.getElementById('user-display-name').innerText = user.displayName || user.email;
+    document.getElementById('auth-btn').innerText = 'ログアウト';
+    document.getElementById('mypage-tab').style.display = 'block';
+    
+    // ★ ホームの初期ロードが完了してから実行する ★
+    // ホームがキャッシュ済みかどうか確認してから
+    setTimeout(async () => {
+      await callGasApi('registerUser', { 
+        uid: user.uid, 
+        name: user.displayName || 'ユーザー', 
+        username: user.email.split('@')[0], 
+        email: user.email 
+      });
+      loadMypageData();
+    }, 500); // 少し遅延させてホームの表示を優先
+    
+  } else {
+    window.currentUser = null;
+    document.getElementById('user-display-name').innerText = '';
+    document.getElementById('auth-btn').innerText = 'ログイン / 登録';
+    document.getElementById('mypage-tab').style.display = 'none';
+  }
+});
   </script>
 
   <script>
@@ -429,22 +438,22 @@ let currentAbortController = null;
     }
 
 // キャッシュ保存用オブジェクト
+// キャッシュ保存用オブジェクト
 const apiCache = {};
 const CACHE_TTL = 60000; // 60秒
+let isInitialLoad = true; // 初期ロード中かどうか
 
 async function callGasApi(action, payload = {}) {
-  // キャッシュキーを生成（アクション＋ペイロードの文字列）
   const cacheKey = action + JSON.stringify(payload);
   const now = Date.now();
   
-  // キャッシュが有効ならそれを返す
   if (apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
     console.log('キャッシュ使用: ' + action);
     return apiCache[cacheKey].data;
   }
 
-  // 通常のリクエスト処理（AbortController含む）
-  if (currentAbortController) {
+  // ★ 初期ロード中はキャンセルしない（ホーム表示を優先） ★
+  if (!isInitialLoad && currentAbortController) {
     currentAbortController.abort();
   }
   currentAbortController = new AbortController();
@@ -461,7 +470,6 @@ async function callGasApi(action, payload = {}) {
     const result = await res.json();
     if (!result.success) throw new Error(result.error);
     
-    // キャッシュに保存
     apiCache[cacheKey] = {
       data: result.data,
       timestamp: now
@@ -469,9 +477,10 @@ async function callGasApi(action, payload = {}) {
     return result.data;
   } catch (e) {
     if (e.name === 'AbortError') {
+      console.log('リクエストキャンセル: ' + action);
       return null;
     }
-    alert("APIエラー: " + e.message);
+    console.error('APIエラー (' + action + '):', e.message);
     return null;
   } finally {
     hideLoading();
@@ -480,7 +489,6 @@ async function callGasApi(action, payload = {}) {
     }
   }
 }
-
     // 画像ファイルを縮小圧縮してBase64化（GASへのPOST送信制限・URL保存不可エラーを解消）
 function fileToBase64(file, maxWidth = 800, quality = 0.7) { 
       return new Promise((resolve, reject) => {
@@ -512,20 +520,33 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
     }
 
     // タブ切替
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      
-      const tabBtn = document.getElementById('tab-btn-' + tabId) || (tabId === 'mypage' ? document.getElementById('mypage-tab') : null);
-      if (tabBtn) tabBtn.classList.add('active');
+   function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  
+  const tabBtn = document.getElementById('tab-btn-' + tabId) || (tabId === 'mypage' ? document.getElementById('mypage-tab') : null);
+  if (tabBtn) tabBtn.classList.add('active');
 
-      if (tabId === 'home') loadHomeCars();
-      if (tabId === 'search') executeSearch();
-      if (tabId === 'makers') loadMakers();
-      if (tabId === 'ranking') loadRanking();
-      if (tabId === 'mypage') loadMypageData();
+  // ★ ホームタブはキャッシュがあれば即表示、なければロード ★
+  if (tabId === 'home') {
+    const cacheKey = 'getCars{}';
+    const cached = apiCache[cacheKey];
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      renderCarGrid('home-car-grid', cached.data);
+      return; // キャッシュがあればAPI呼び出ししない
     }
+    loadHomeCars();
+  } else if (tabId === 'search') {
+    executeSearch();
+  } else if (tabId === 'makers') {
+    loadMakers();
+  } else if (tabId === 'ranking') {
+    loadRanking();
+  } else if (tabId === 'mypage') {
+    loadMypageData();
+  }
+}
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -557,28 +578,40 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
       }
     }
 
-    // --- データ読み込み系 ---
-    async function loadHomeCars() {
+  
+// ホームタブ読み込み（初期表示用）
+async function loadHomeCars(force = false) {
+  // キャッシュがあればそれを表示（キャッシュがなければAPI呼び出し）
+  const cacheKey = 'getCars{}';
+  const cached = apiCache[cacheKey];
+  if (!force && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log('ホーム: キャッシュを使用');
+    renderCarGrid('home-car-grid', cached.data);
+    return;
+  }
+
+  // 初期ロードフラグを立てる（キャンセルされないように）
+  isInitialLoad = true;
   const cars = await callGasApi('getCars');
-  if (cars === null) {
-    // エラー時は再試行ボタンなどを表示（簡易的には空のまま）
-    document.getElementById('home-car-grid').innerHTML = '<p style="color:#888;">データの読み込みに失敗しました。再読み込みしてください。</p>';
+  isInitialLoad = false;
+  
+  const grid = document.getElementById('home-car-grid');
+  if (cars === null || cars.length === 0) {
+    // キャッシュがあればそれを使う（バックアップ）
+    if (cached && cached.data && cached.data.length > 0) {
+      renderCarGrid('home-car-grid', cached.data);
+      return;
+    }
+    grid.innerHTML = `
+      <div style="text-align:center; padding:40px; color:#888; grid-column: 1 / -1;">
+        <p>データの読み込みに失敗しました。</p>
+        <button class="btn" onclick="loadHomeCars(true)" style="margin-top:10px;">再読み込み</button>
+      </div>
+    `;
   } else {
     renderCarGrid('home-car-grid', cars);
   }
 }
-
-    async function executeSearch() {
-      const keyword = document.getElementById('search-keyword').value;
-      const genre = document.getElementById('search-genre').value;
-      const filter = { keyword: keyword, genre: genre };
-      if (currentSelectedMakerId) {
-        filter.makerId = currentSelectedMakerId;
-      }
-      const cars = await callGasApi('getCars', filter);
-      renderCarGrid('search-car-grid', cars || []);
-    }
-
     // メーカー指定で車両一覧を表示する（メーカー一覧クリック時）
     function filterByMaker(makerId, makerName) {
       currentSelectedMakerId = makerId;
