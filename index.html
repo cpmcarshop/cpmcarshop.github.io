@@ -571,32 +571,51 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
     }
 
     // 購入実行
-    async function executePurchase() {
-      if (!window.currentUser) return alert("購入にはログインが必要です");
-      const grade = document.getElementById('buy-grade').value;
-      const color = document.getElementById('buy-color').value;
-      const options = [];
-      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
-      const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
+// 購入実行
+async function executePurchase() {
+  if (!window.currentUser) return alert("購入にはログインが必要です");
+  const grade = document.getElementById('buy-grade').value;
+  const color = document.getElementById('buy-color').value;
+  const options = [];
+  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
+  const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
 
-      if (currentCarDetail.contactType === 'twitter') {
-        const text = encodeURIComponent(`${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ')}\n合計: ${totalPrice.toLocaleString()} CR`);
-        window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+  // Twitter DM 連携（contactTypeがtwitterの場合）
+  if (currentCarDetail.contactType === 'twitter') {
+    const twitterId = currentCarDetail.maker?.twitterId;
+    if (twitterId) {
+      // DM作成画面を開く（@を除去）
+      const cleanId = twitterId.replace(/^@/, '');
+      // メッセージ内容をコピーできるように表示（オプション）
+      const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
+      // クリップボードにコピー（ユーザーがDMで貼り付けやすくする）
+      try {
+        await navigator.clipboard.writeText(message);
+        alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
+      } catch (e) {
+        // クリップボード非対応ブラウザの場合、メッセージを表示
+        alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
       }
-
-      // ポータル内注文作成
-      const res = await callGasApi('createOrder', {
-        carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
-        makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-        buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
-        gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName
-      });
-
-      if (res) {
-        alert(res.message);
-        closeModal('detail-modal');
-      }
+      // DM作成リンクを開く
+      window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
+    } else {
+      alert('メーカーのTwitter IDが未設定です。');
     }
+  }
+
+  // ポータル内注文作成（従来通り）
+  const res = await callGasApi('createOrder', {
+    carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
+    makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+    buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
+    gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName
+  });
+
+  if (res) {
+    alert(res.message);
+    closeModal('detail-modal');
+  }
+}
 
     async function deleteCar(carId) {
   if (!confirm("この車両を削除してもよろしいですか？")) return;
