@@ -469,7 +469,7 @@ const apiCache = {};
 const CACHE_TTL = 60000; // 60秒
 let isInitialLoad = true; // 初期ロード中かどうか
 
-async function callGasApi(action, payload = {}) {
+async function callGasApi(action, payload = {}, showLoadingFlag = true) {
   const cacheKey = action + JSON.stringify(payload);
   const now = Date.now();
   
@@ -478,14 +478,17 @@ async function callGasApi(action, payload = {}) {
     return apiCache[cacheKey].data;
   }
 
-  // ★ 初期ロード中はキャンセルしない（ホーム表示を優先） ★
   if (!isInitialLoad && currentAbortController) {
     currentAbortController.abort();
   }
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
 
-  showLoading("サーバーと通信中...");
+  // ★ showLoadingFlag が true の場合のみローディング表示
+  if (showLoadingFlag) {
+    showLoading("サーバーと通信中...");
+  }
+
   try {
     const res = await fetch(GAS_URL, {
       method: 'POST',
@@ -509,7 +512,10 @@ async function callGasApi(action, payload = {}) {
     console.error('APIエラー (' + action + '):', e.message);
     return null;
   } finally {
-    hideLoading();
+    // ★ ローディング表示していた場合のみ非表示
+    if (showLoadingFlag) {
+      hideLoading();
+    }
     if (currentAbortController && currentAbortController.signal === signal) {
       currentAbortController = null;
     }
@@ -848,17 +854,18 @@ async function openCarDetail(carId) {
   if (!car) return;
   currentCarDetail = car;
 
-  // ★ 3秒後に視聴数をカウント（まだカウントしていない場合のみ）
+  // ★ 3秒後に視聴数をカウント（ローディング表示なしで実行）
   if (!viewedCarIds[carId]) {
-    viewedCarIds[carId] = true; // すぐにフラグを立てて二重起動を防止
+    viewedCarIds[carId] = true;
     setTimeout(async () => {
       try {
-        await callGasApi('incrementViewCount', { carId: carId });
+        // ★ 第3引数に false を渡してローディング表示をスキップ
+        await callGasApi('incrementViewCount', { carId: carId }, false);
         console.log('視聴数カウント: ' + carId);
       } catch (e) {
         console.error('視聴数カウントエラー:', e);
       }
-    }, 3000); // 3秒後
+    }, 3000);
   }
 
       // 画像リストを構築（img1〜img4 で有効なもの）
