@@ -429,24 +429,45 @@
     }
 
     // API通信共通関数（ローディング制御追加）
-    async function callGasApi(action, payload = {}) {
-      showLoading("サーバーと通信中...");
-      try {
-        const res = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: action, payload: payload })
-        });
-        const result = await res.json();
-        if (!result.success) throw new Error(result.error);
-        return result.data;
-      } catch (e) {
-        alert("APIエラー: " + e.message);
-        return null;
-      } finally {
-        hideLoading();
-      }
+let currentAbortController = null; // 進行中のリクエストをキャンセルするためのコントローラー
+
+async function callGasApi(action, payload = {}) {
+  // 前のリクエストがあればキャンセル
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  
+  // 新しいコントローラーを作成
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
+  showLoading("サーバーと通信中...");
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: action, payload: payload }),
+      signal: signal
+    });
+    const result = await res.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      // キャンセルされた場合は何も表示しない（ユーザーがタブを移動しただけ）
+      return null;
     }
+    alert("APIエラー: " + e.message);
+    return null;
+  } finally {
+    // キャンセルされた場合でも確実にローディングを消す
+    hideLoading();
+    // 現在のコントローラーが自分ならクリア
+    if (currentAbortController && currentAbortController.signal === signal) {
+      currentAbortController = null;
+    }
+  }
+}
 
     // 画像ファイルを縮小圧縮してBase64化（GASへのPOST送信制限・URL保存不可エラーを解消）
 function fileToBase64(file, maxWidth = 800, quality = 0.7) { 
@@ -886,43 +907,44 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
     }
 
     // サブフォーム追加（グレード・カラー・オプション）
-    function addGradeForm(data = {}) {
-      const container = document.getElementById('grade-container');
-      container.insertAdjacentHTML('beforeend', `
-        <div class="sub-item-box grade-item">
-          <input type="text" placeholder="グレード名" class="g-name" value="${data.gradeName || ''}" style="width:45%;">
-          <input type="number" placeholder="価格CR" class="g-price" value="${data.price || ''}" style="width:45%;">
-          <input type="text" placeholder="説明" class="g-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
-          <input type="hidden" class="g-existing-img" value="${data.imgUrl || ''}">
-          <input type="file" class="g-img" accept="image/*" style="margin-top:5px;">
-        </div>
-      `);
-    }
-
+function addGradeForm(data = {}) {
+  const container = document.getElementById('grade-container');
+  container.insertAdjacentHTML('beforeend', `
+    <div class="sub-item-box grade-item">
+      <input type="text" placeholder="グレード名" class="g-name" value="${data.gradeName || ''}" style="width:40%;">
+      <input type="number" placeholder="価格CR" class="g-price" value="${data.price || ''}" style="width:30%;">
+      <input type="text" placeholder="説明" class="g-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
+      <input type="hidden" class="g-existing-img" value="${data.imgUrl || ''}">
+      <input type="file" class="g-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <button type="button" class="btn btn-danger" onclick="this.closest('.grade-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
+    </div>
+  `);
+}
     function addColorForm(data = {}) {
-      const container = document.getElementById('color-container');
-      container.insertAdjacentHTML('beforeend', `
-        <div class="sub-item-box color-item">
-          <input type="text" placeholder="色名" class="cl-name" value="${data.colorName || ''}" style="width:45%;">
-          <input type="number" placeholder="追加価格CR" class="cl-price" value="${data.price || ''}" style="width:45%;">
-          <input type="hidden" class="cl-existing-img" value="${data.imgUrl || ''}">
-          <input type="file" class="cl-img" accept="image/*" style="margin-top:5px;">
-        </div>
-      `);
-    }
-
+  const container = document.getElementById('color-container');
+  container.insertAdjacentHTML('beforeend', `
+    <div class="sub-item-box color-item">
+      <input type="text" placeholder="色名" class="cl-name" value="${data.colorName || ''}" style="width:40%;">
+      <input type="number" placeholder="追加価格CR" class="cl-price" value="${data.price || ''}" style="width:30%;">
+      <input type="hidden" class="cl-existing-img" value="${data.imgUrl || ''}">
+      <input type="file" class="cl-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <button type="button" class="btn btn-danger" onclick="this.closest('.color-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
+    </div>
+  `);
+}
     function addOptionForm(data = {}) {
-      const container = document.getElementById('option-container');
-      container.insertAdjacentHTML('beforeend', `
-        <div class="sub-item-box option-item">
-          <input type="text" placeholder="オプション名" class="op-name" value="${data.optionName || ''}" style="width:45%;">
-          <input type="number" placeholder="価格CR" class="op-price" value="${data.price || ''}" style="width:45%;">
-          <input type="text" placeholder="説明" class="op-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
-          <input type="hidden" class="op-existing-img" value="${data.imgUrl || ''}">
-          <input type="file" class="op-img" accept="image/*" style="margin-top:5px;">
-        </div>
-      `);
-    }
+  const container = document.getElementById('option-container');
+  container.insertAdjacentHTML('beforeend', `
+    <div class="sub-item-box option-item">
+      <input type="text" placeholder="オプション名" class="op-name" value="${data.optionName || ''}" style="width:40%;">
+      <input type="number" placeholder="価格CR" class="op-price" value="${data.price || ''}" style="width:30%;">
+      <input type="text" placeholder="説明" class="op-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
+      <input type="hidden" class="op-existing-img" value="${data.imgUrl || ''}">
+      <input type="file" class="op-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <button type="button" class="btn btn-danger" onclick="this.closest('.option-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
+    </div>
+  `);
+}
 
     function openMakerModal() { document.getElementById('maker-modal').style.display = 'flex'; }
     
