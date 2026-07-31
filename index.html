@@ -428,16 +428,25 @@
       }
     }
 
-    // API通信共通関数（ローディング制御追加）
-let currentAbortController = null; // 進行中のリクエストをキャンセルするためのコントローラー
+// キャッシュ保存用オブジェクト
+const apiCache = {};
+const CACHE_TTL = 60000; // 60秒
 
 async function callGasApi(action, payload = {}) {
-  // 前のリクエストがあればキャンセル
+  // キャッシュキーを生成（アクション＋ペイロードの文字列）
+  const cacheKey = action + JSON.stringify(payload);
+  const now = Date.now();
+  
+  // キャッシュが有効ならそれを返す
+  if (apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
+    console.log('キャッシュ使用: ' + action);
+    return apiCache[cacheKey].data;
+  }
+
+  // 通常のリクエスト処理（AbortController含む）
   if (currentAbortController) {
     currentAbortController.abort();
   }
-  
-  // 新しいコントローラーを作成
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
 
@@ -446,23 +455,26 @@ async function callGasApi(action, payload = {}) {
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: action, payload: payload }),
-      signal: signal
+      body: JSON.stringify({ action, payload }),
+      signal
     });
     const result = await res.json();
     if (!result.success) throw new Error(result.error);
+    
+    // キャッシュに保存
+    apiCache[cacheKey] = {
+      data: result.data,
+      timestamp: now
+    };
     return result.data;
   } catch (e) {
     if (e.name === 'AbortError') {
-      // キャンセルされた場合は何も表示しない（ユーザーがタブを移動しただけ）
       return null;
     }
     alert("APIエラー: " + e.message);
     return null;
   } finally {
-    // キャンセルされた場合でも確実にローディングを消す
     hideLoading();
-    // 現在のコントローラーが自分ならクリア
     if (currentAbortController && currentAbortController.signal === signal) {
       currentAbortController = null;
     }
@@ -547,9 +559,14 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
 
     // --- データ読み込み系 ---
     async function loadHomeCars() {
-      const cars = await callGasApi('getCars');
-      renderCarGrid('home-car-grid', cars || []);
-    }
+  const cars = await callGasApi('getCars');
+  if (cars === null) {
+    // エラー時は再試行ボタンなどを表示（簡易的には空のまま）
+    document.getElementById('home-car-grid').innerHTML = '<p style="color:#888;">データの読み込みに失敗しました。再読み込みしてください。</p>';
+  } else {
+    renderCarGrid('home-car-grid', cars);
+  }
+}
 
     async function executeSearch() {
       const keyword = document.getElementById('search-keyword').value;
