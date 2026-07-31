@@ -83,14 +83,108 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* ===== 追加: カルーセル用スタイル ===== */
+    .carousel-container {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto 15px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #000;
+    }
+    .carousel-slides {
+      display: flex;
+      transition: transform 0.3s ease;
+    }
+    .carousel-slide {
+      min-width: 100%;
+      box-sizing: border-box;
+    }
+    .carousel-slide img {
+      width: 100%;
+      height: auto;
+      max-height: 400px;
+      object-fit: contain;
+      background: #000;
+    }
+    .carousel-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-size: 24px;
+      z-index: 10;
+      border-radius: 50%;
+      user-select: none;
+    }
+    .carousel-btn:hover {
+      background: rgba(0,0,0,0.8);
+    }
+    .carousel-btn.prev { left: 10px; }
+    .carousel-btn.next { right: 10px; }
+    .carousel-dots {
+      text-align: center;
+      margin-top: 8px;
+    }
+    .carousel-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #555;
+      margin: 0 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .carousel-dot.active {
+      background: var(--main-color);
+    }
+    .sub-image-container {
+      margin-top: 10px;
+      text-align: center;
+    }
+    .sub-image-container img {
+      max-width: 100%;
+      max-height: 150px;
+      border-radius: 4px;
+      border: 1px solid #444;
+    }
+    .sub-image-container .sub-img-placeholder {
+      color: #666;
+      font-size: 0.85rem;
+      padding: 10px;
+    }
+    .option-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .option-images img {
+      max-height: 80px;
+      border-radius: 4px;
+      border: 1px solid #444;
+    }
   </style>
 </head>
 <body>
 
-  <!-- ローディング表示用要素 -->
+  <!-- ローディング表示用要素（テキスト追加） -->
   <div id="global-loading">
     <div class="spinner"></div>
     <div id="loading-text">データを読み込み中...</div>
+    <!-- 追加: フッターテキスト -->
+    <div style="margin-top: 20px; font-size: 0.8rem; color: #888; text-align: center; line-height: 1.6;">
+      ＊いつまでたっても進まない場合はページを再読み込みしてください。<br>
+      PRODUCED BY MPEK Group<br>
+      架空車街はMPEK Groupによって運営されています。
+    </div>
   </div>
 
   <header>
@@ -509,39 +603,151 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
   `).join('');
 }
 
-    // 車両詳細＆カスタマイズ購入モーダル
+    // ========================
+    // 車両詳細（カルーセル＋項目画像表示）
+    // ========================
     let currentCarDetail = null;
+    let carouselIndex = 0;
+    let carouselImages = [];
+
+    function renderCarousel() {
+      const container = document.getElementById('carousel-container');
+      if (!container) return;
+      const slides = container.querySelector('.carousel-slides');
+      const dots = container.querySelector('.carousel-dots');
+      if (!slides || !dots) return;
+
+      // スライド更新
+      slides.innerHTML = carouselImages.map(url => `
+        <div class="carousel-slide"><img src="${url}" alt="車両画像"></div>
+      `).join('');
+
+      // ドット更新
+      dots.innerHTML = carouselImages.map((_, idx) => `
+        <span class="carousel-dot${idx === carouselIndex ? ' active' : ''}" onclick="goToSlide(${idx})"></span>
+      `).join('');
+
+      // スライド位置
+      slides.style.transform = `translateX(-${carouselIndex * 100}%)`;
+    }
+
+    function goToSlide(index) {
+      const total = carouselImages.length;
+      if (total === 0) return;
+      carouselIndex = (index + total) % total;
+      renderCarousel();
+      // 選択画像の表示を更新（サムネイル用）
+      updateSubImageDisplay();
+    }
+
+    function prevSlide() {
+      goToSlide(carouselIndex - 1);
+    }
+
+    function nextSlide() {
+      goToSlide(carouselIndex + 1);
+    }
+
+    // グレード・カラー・オプションの画像表示を更新
+    function updateSubImageDisplay() {
+      // グレード画像
+      const gradeSelect = document.getElementById('buy-grade');
+      const gradeImgContainer = document.getElementById('grade-image-display');
+      if (gradeSelect && gradeImgContainer && currentCarDetail) {
+        const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
+        if (selectedOption) {
+          const gradeName = selectedOption.value;
+          const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
+          if (grade && grade.imgUrl) {
+            gradeImgContainer.innerHTML = `<img src="${grade.imgUrl}" alt="${gradeName}">`;
+          } else {
+            gradeImgContainer.innerHTML = `<div class="sub-img-placeholder">画像なし</div>`;
+          }
+        }
+      }
+
+      // カラー画像
+      const colorSelect = document.getElementById('buy-color');
+      const colorImgContainer = document.getElementById('color-image-display');
+      if (colorSelect && colorImgContainer && currentCarDetail) {
+        const selectedOption = colorSelect.options[colorSelect.selectedIndex];
+        if (selectedOption) {
+          const colorName = selectedOption.value;
+          const color = currentCarDetail.colors.find(c => c.colorName === colorName);
+          if (color && color.imgUrl) {
+            colorImgContainer.innerHTML = `<img src="${color.imgUrl}" alt="${colorName}">`;
+          } else {
+            colorImgContainer.innerHTML = `<div class="sub-img-placeholder">画像なし</div>`;
+          }
+        }
+      }
+
+      // オプション画像（チェックされたものをすべて表示）
+      const optionContainer = document.getElementById('option-images-display');
+      if (optionContainer && currentCarDetail) {
+        const checkedOptions = [];
+        document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
+          const optName = cb.dataset.name;
+          const opt = currentCarDetail.options.find(o => o.optionName === optName);
+          if (opt && opt.imgUrl) {
+            checkedOptions.push(opt);
+          }
+        });
+        if (checkedOptions.length > 0) {
+          optionContainer.innerHTML = checkedOptions.map(o => `<img src="${o.imgUrl}" alt="${o.optionName}" title="${o.optionName}">`).join('');
+        } else {
+          optionContainer.innerHTML = `<div class="sub-img-placeholder">選択中のオプションはありません</div>`;
+        }
+      }
+    }
+
+    // 車両詳細を開く（カルーセル＋項目画像対応）
     async function openCarDetail(carId) {
       const car = await callGasApi('getCarDetail', { carId: carId });
       if (!car) return;
       currentCarDetail = car;
 
+      // 画像リストを構築（img1〜img4 で有効なもの）
+      carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
+      carouselIndex = 0;
+
       const body = document.getElementById('detail-modal-body');
       body.innerHTML = `
         <h2>${car.carName}</h2>
         <p style="color:var(--main-color);">${car.maker ? car.maker.makerName : ''}</p>
-        <div style="display:flex; gap:10px; overflow-x:auto; margin-bottom:15px;">
-          ${[car.img1, car.img2, car.img3, car.img4].filter(Boolean).map((img, idx) => `<img src="${img}" style="height:120px; border-radius:4px; border: ${idx === 0 ? '2px solid var(--main-color)' : 'none'};">`).join('')}
+
+        <!-- カルーセル -->
+        <div id="carousel-container" class="carousel-container">
+          <div class="carousel-slides"></div>
+          ${carouselImages.length > 1 ? `
+            <button class="carousel-btn prev" onclick="prevSlide()">‹</button>
+            <button class="carousel-btn next" onclick="nextSlide()">›</button>
+          ` : ''}
+          <div class="carousel-dots"></div>
         </div>
+
         <p>${car.description}</p>
 
         <h4>1. グレード選択</h4>
-        <select id="buy-grade" onchange="calculateTotalPrice()" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
-          ${car.grades.map(g => `<option value="${g.gradeName}" data-price="${g.price}">${g.gradeName} (+${Number(g.price).toLocaleString()} CR)</option>`).join('')}
+        <select id="buy-grade" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
+          ${car.grades.map(g => `<option value="${g.gradeName}" data-price="${g.price}" data-img="${g.imgUrl || ''}">${g.gradeName} (+${Number(g.price).toLocaleString()} CR)</option>`).join('')}
         </select>
+        <div id="grade-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
         <h4>2. カラー選択</h4>
-        <select id="buy-color" onchange="calculateTotalPrice()" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
-          ${car.colors.map(c => `<option value="${c.colorName}" data-price="${c.price}">${c.colorName} (+${Number(c.price).toLocaleString()} CR)</option>`).join('')}
+        <select id="buy-color" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
+          ${car.colors.map(c => `<option value="${c.colorName}" data-price="${c.price}" data-img="${c.imgUrl || ''}">${c.colorName} (+${Number(c.price).toLocaleString()} CR)</option>`).join('')}
         </select>
+        <div id="color-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
         <h4>3. オプション選択</h4>
         ${car.options.map((o, idx) => `
           <div>
-            <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.price}" onchange="calculateTotalPrice()">
+            <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.price}" data-img="${o.imgUrl || ''}" onchange="updateSubImageDisplay(); calculateTotalPrice();">
             <label for="opt-${idx}">${o.optionName} (+${Number(o.price).toLocaleString()} CR) - ${o.description}</label>
           </div>
         `).join('')}
+        <div id="option-images-display" class="sub-image-container option-images"><div class="sub-img-placeholder">選択中のオプションはありません</div></div>
 
         <hr style="border-color:#333; margin:20px 0;">
         <h3 style="color:var(--main-color);">合計見積金額: <span id="buy-total-price">0</span> CR</h3>
@@ -549,8 +755,17 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
         <button class="btn" style="width:100%; padding:12px;" onclick="executePurchase()">購入・注文を送信</button>
         <button class="btn btn-secondary" style="width:100%; margin-top:8px;" onclick="closeModal('detail-modal')">閉じる</button>
       `;
+
+      // カルーセル描画
+      renderCarousel();
+
+      // 初期表示用に画像更新
+      setTimeout(() => {
+        updateSubImageDisplay();
+        calculateTotalPrice();
+      }, 50);
+
       document.getElementById('detail-modal').style.display = 'flex';
-      calculateTotalPrice();
     }
 
     function calculateTotalPrice() {
@@ -571,60 +786,54 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
     }
 
     // 購入実行
-// 購入実行
-async function executePurchase() {
-  if (!window.currentUser) return alert("購入にはログインが必要です");
-  const grade = document.getElementById('buy-grade').value;
-  const color = document.getElementById('buy-color').value;
-  const options = [];
-  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
-  const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
+    async function executePurchase() {
+      if (!window.currentUser) return alert("購入にはログインが必要です");
+      const grade = document.getElementById('buy-grade').value;
+      const color = document.getElementById('buy-color').value;
+      const options = [];
+      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
+      const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
 
-  // Twitter DM 連携（contactTypeがtwitterの場合）
-  if (currentCarDetail.contactType === 'twitter') {
-    const twitterId = currentCarDetail.maker?.twitterId;
-    if (twitterId) {
-      // DM作成画面を開く（@を除去）
-      const cleanId = twitterId.replace(/^@/, '');
-      // メッセージ内容をコピーできるように表示（オプション）
-      const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
-      // クリップボードにコピー（ユーザーがDMで貼り付けやすくする）
-      try {
-        await navigator.clipboard.writeText(message);
-        alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
-      } catch (e) {
-        // クリップボード非対応ブラウザの場合、メッセージを表示
-        alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
+      // Twitter DM 連携（contactTypeがtwitterの場合）
+      if (currentCarDetail.contactType === 'twitter') {
+        const twitterId = currentCarDetail.maker?.twitterId;
+        if (twitterId) {
+          const cleanId = twitterId.replace(/^@/, '');
+          const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
+          try {
+            await navigator.clipboard.writeText(message);
+            alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
+          } catch (e) {
+            alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
+          }
+          window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
+        } else {
+          alert('メーカーのTwitter IDが未設定です。');
+        }
       }
-      // DM作成リンクを開く
-      window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
-    } else {
-      alert('メーカーのTwitter IDが未設定です。');
+
+      // ポータル内注文作成
+      const res = await callGasApi('createOrder', {
+        carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
+        makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+        buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
+        gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName
+      });
+
+      if (res) {
+        alert(res.message);
+        closeModal('detail-modal');
+      }
     }
-  }
-
-  // ポータル内注文作成（従来通り）
-  const res = await callGasApi('createOrder', {
-    carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
-    makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-    buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
-    gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName
-  });
-
-  if (res) {
-    alert(res.message);
-    closeModal('detail-modal');
-  }
-}
 
     async function deleteCar(carId) {
-  if (!confirm("この車両を削除してもよろしいですか？")) return;
-  const res = await callGasApi('deleteCar', { carId: carId });
-  if (res) {
-    alert(res.message);
-    loadMypageData();  // 一覧を再読み込み
-  }
-}
+      if (!confirm("この車両を削除してもよろしいですか？")) return;
+      const res = await callGasApi('deleteCar', { carId: carId });
+      if (res) {
+        alert(res.message);
+        loadMypageData();
+      }
+    }
 
     // --- マイページ・店舗管理 ---
     async function loadMypageData() {
@@ -648,7 +857,6 @@ async function executePurchase() {
         </div>
       `;
 
-      // 注文・通知一覧
       const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
       const orderList = document.getElementById('orders-notification-list');
       if (orderRes && orderRes.orders.length > 0) {
@@ -664,7 +872,6 @@ async function executePurchase() {
         orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
       }
 
-      // 自社車両
       const myCars = await callGasApi('getCars', { makerId: maker.makerId });
       renderCarGrid('my-cars-grid', myCars || [], true);
     }
@@ -719,7 +926,6 @@ async function executePurchase() {
 
     function openMakerModal() { document.getElementById('maker-modal').style.display = 'flex'; }
     
-    // 車両モーダル（新規出品）
     function openCarModal() {
       document.getElementById('car-modal-title').innerText = "架空車両の新規出品";
       document.getElementById('c-id').value = '';
@@ -739,7 +945,6 @@ async function executePurchase() {
       document.getElementById('car-modal').style.display = 'flex';
     }
 
-    // 車両モーダル（既存車両の編集）
     async function editCar(carId) {
       const car = await callGasApi('getCarDetail', { carId: carId });
       if (!car) return;
@@ -783,7 +988,6 @@ async function executePurchase() {
       document.getElementById('car-modal').style.display = 'flex';
     }
 
-    // メーカー情報保存
     async function submitMaker() {
       const payload = {
         uid: window.currentUser.uid,
@@ -802,7 +1006,6 @@ async function executePurchase() {
       }
     }
 
-    // 車両登録・更新保存
     async function submitCar() {
       const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
       if (!maker) return alert("先にメーカー登録を行ってください");
