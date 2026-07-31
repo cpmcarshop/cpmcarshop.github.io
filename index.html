@@ -556,8 +556,8 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
 
   // ★ ホームタブはキャッシュがあれば即表示、なければロード ★
   if (tabId === 'home') {
-    const cacheKey = 'getCars{}';
-    const cached = apiCache[cacheKey];
+  const cacheKey = 'getCars{"sortBy":"view"}';  // ← loadHomeCarsと同じキーに
+  const cached = apiCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
       renderCarGrid('home-car-grid', cached.data);
       return; // キャッシュがあればAPI呼び出ししない
