@@ -1105,6 +1105,7 @@ async function openCarDetail(carId) {
     // --- マイページ・店舗管理 ---
    // --- マイページ・店舗管理 ---
 // --- マイページ・店舗管理 ---
+// --- マイページ・店舗管理 ---
 async function loadMypageData() {
   if (!window.currentUser) return;
   const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
@@ -1112,9 +1113,13 @@ async function loadMypageData() {
 
   if (!maker) {
     statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
+    // 管理セクションをクリア（既存のものが残らないように）
+    const existingAdmin = document.getElementById('admin-sections');
+    if (existingAdmin) existingAdmin.remove();
     return;
   }
 
+  // ★ メーカー情報表示
   statusArea.innerHTML = `
     <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
       <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
@@ -1126,8 +1131,16 @@ async function loadMypageData() {
     </div>
   `;
 
-  // ★★★ クーポン発行フォーム ★★★
-  statusArea.insertAdjacentHTML('afterend', `
+  // ★★★ 管理セクションを1つのコンテナにまとめる ★★★
+  // 既存の管理セクションがあれば削除してから新しく作成
+  const existingAdmin = document.getElementById('admin-sections');
+  if (existingAdmin) existingAdmin.remove();
+
+  const adminContainer = document.createElement('div');
+  adminContainer.id = 'admin-sections';
+
+  adminContainer.innerHTML = `
+    <!-- クーポン発行フォーム -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="coupon-management">
       <h3>📢 クーポン発行（全ユーザー向け）</h3>
@@ -1145,19 +1158,15 @@ async function loadMypageData() {
         <button class="btn" onclick="publishCoupon()" style="grid-column: span 2;">クーポンを発行</button>
       </div>
     </div>
-  `);
 
-  // ★★★ 発行済みクーポン一覧 ★★★
-  statusArea.insertAdjacentHTML('afterend', `
+    <!-- 発行済みクーポン一覧 -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="my-coupons-list">
       <h3>📋 発行済みクーポン</h3>
       <div id="coupons-list-container"></div>
     </div>
-  `);
 
-  // ★★★ セール設定フォーム ★★★
-  statusArea.insertAdjacentHTML('afterend', `
+    <!-- セール設定フォーム -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="sale-management">
       <h3>🔥 セール設定（自社車両対象）</h3>
@@ -1178,18 +1187,19 @@ async function loadMypageData() {
         <button class="btn" onclick="setSale()" style="grid-column: span 2;">セールを設定</button>
       </div>
     </div>
-  `);
 
-  // ★★★ 設定済みセール一覧 ★★★
-  statusArea.insertAdjacentHTML('afterend', `
+    <!-- 設定済みセール一覧 -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="my-sales-list">
       <h3>📋 設定済みセール</h3>
       <div id="sales-list-container"></div>
     </div>
-  `);
+  `;
 
-  // 注文・通知一覧
+  // ★ statusArea の直後に管理コンテナを挿入
+  statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
+
+  // ★★★ 注文・通知一覧（既存のDOMをそのまま使用） ★★★
   const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
   const orderList = document.getElementById('orders-notification-list');
   if (orderRes && orderRes.orders.length > 0) {
@@ -1205,7 +1215,7 @@ async function loadMypageData() {
     orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
   }
 
-  // 自社車両
+  // ★★★ 自社車両 ★★★
   const myCars = await callGasApi('getCars', { makerId: maker.makerId });
   renderCarGrid('my-cars-grid', myCars || [], true);
 
