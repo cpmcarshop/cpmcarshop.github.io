@@ -1147,78 +1147,123 @@ async function openCarDetail(carId) {
 
     async function applyCouponToDetail() {
   const code = document.getElementById('coupon-input').value.trim();
-  if (!code) return alert("クーポンコードを入力してください");
-  // ★ 現在のセール反映済み合計を取得（calculateTotalPrice は表示も更新するが、数値は再度計算する）
-  // ここでは calculateTotalPrice を呼んで合計を再計算し、その値を元にクーポン検証
-  calculateTotalPrice(); // 合計表示を最新に更新
+  if (!code) {
+    alert("クーポンコードを入力してください");
+    return;
+  }
+  
+  // ★ まず合計を最新に更新（セール価格を反映）
+  calculateTotalPrice();
+  
+  // ★ 表示されている合計金額を取得
   const totalDisplay = document.getElementById('buy-total-price');
   let total = Number(totalDisplay.innerText.replace(/,/g, ''));
-  if (isNaN(total)) total = 0;
-
+  if (isNaN(total) || total <= 0) {
+    alert("合計金額が正しく計算できません。グレードが選択されているか確認してください。");
+    return;
+  }
+  
+  console.log('🔍 クーポン検証: コード=' + code + ', 合計=' + total);
+  
   const result = await callGasApi('validateCoupon', {
     code: code,
     carId: currentCarDetail.carId,
     totalAmount: total
   });
+  
   if (result) {
     appliedCouponDetail = result;
     document.getElementById('coupon-status').innerHTML = `✅ クーポン「${result.description}」適用中 (${result.discountType === 'fixed' ? result.discountValue + 'CR OFF' : result.discountValue + '% OFF'})`;
-    calculateTotalPriceWithCoupon(); // ★ セール価格を反映した上でクーポン適用
+    calculateTotalPriceWithCoupon();
   } else {
-    alert("無効なクーポンコードです");
+    alert("無効なクーポンコードです。有効期限や対象車両をご確認ください。");
   }
 }
 
     function removeCouponFromDetail() {
-      appliedCouponDetail = null;
-      document.getElementById('coupon-status').innerHTML = '';
-      document.getElementById('coupon-input').value = '';
-      document.getElementById('coupon-discount-info').innerHTML = '';
-      calculateTotalPrice();
-    }
-
+  appliedCouponDetail = null;
+  document.getElementById('coupon-status').innerHTML = '';
+  document.getElementById('coupon-input').value = '';
+  document.getElementById('coupon-discount-info').innerHTML = '';
+  // ★ クーポン解除後は通常の合計計算に戻す
+  calculateTotalPrice();
+}
 function calculateTotalPriceWithCoupon() {
-  if (!currentCarDetail) return;
+  if (!currentCarDetail) {
+    console.error('❌ currentCarDetail がありません');
+    return;
+  }
+  
+  // ★★★ デバッグログ（ブラウザのコンソールで確認） ★★★
+  console.log('🪙 calculateTotalPriceWithCoupon 開始');
+  
+  // ★ セール価格を優先して合計を計算（calculateTotalPrice と同じロジック）
   let total = 0;
 
-  // ★ セール価格を優先する（calculateTotalPrice と同じロジック）
   const gradeEl = document.getElementById('buy-grade');
   if (gradeEl && gradeEl.selectedOptions[0]) {
     const gradeName = gradeEl.value;
     const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
-    total += (grade && grade.salePrice !== undefined && grade.salePrice !== null) 
-             ? grade.salePrice 
-             : Number(gradeEl.selectedOptions[0].dataset.price || 0);
+    const price = (grade && grade.salePrice !== undefined && grade.salePrice !== null) 
+      ? grade.salePrice 
+      : Number(gradeEl.selectedOptions[0].dataset.price || 0);
+    console.log(`  グレード「${gradeName}」: ${price} CR`);
+    total += price;
   }
 
   const colorEl = document.getElementById('buy-color');
   if (colorEl && colorEl.selectedOptions[0]) {
     const colorName = colorEl.value;
     const color = currentCarDetail.colors.find(c => c.colorName === colorName);
-    total += (color && color.salePrice !== undefined && color.salePrice !== null) 
-             ? color.salePrice 
-             : Number(colorEl.selectedOptions[0].dataset.price || 0);
+    const price = (color && color.salePrice !== undefined && color.salePrice !== null) 
+      ? color.salePrice 
+      : Number(colorEl.selectedOptions[0].dataset.price || 0);
+    console.log(`  カラー「${colorName}」: ${price} CR`);
+    total += price;
   }
 
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
     const optName = cb.dataset.name;
     const opt = currentCarDetail.options.find(o => o.optionName === optName);
-    total += (opt && opt.salePrice !== undefined && opt.salePrice !== null) 
-             ? opt.salePrice 
-             : Number(cb.dataset.price || 0);
+    const price = (opt && opt.salePrice !== undefined && opt.salePrice !== null) 
+      ? opt.salePrice 
+      : Number(cb.dataset.price || 0);
+    console.log(`  オプション「${optName}」: ${price} CR`);
+    total += price;
   });
+
+  console.log(`💰 クーポン適用前の合計: ${total} CR`);
 
   // ★ クーポン割引を適用
   if (appliedCouponDetail) {
+    console.log('🪙 クーポン詳細:', appliedCouponDetail);
+    
     let discounted = total;
     if (appliedCouponDetail.discountType === 'fixed') {
-      const discount = Math.min(appliedCouponDetail.discountValue, total);
-      discounted = Math.max(0, total - discount);
+      // ★ 固定額割引
+      if (appliedCouponDetail.discountValue >= total) {
+        // 割引額が合計を超える場合はエラー表示（0 にはしない）
+        alert('クーポンの割引額（' + appliedCouponDetail.discountValue + 'CR）が合計金額（' + total + 'CR）を超えています。');
+        document.getElementById('coupon-status').innerHTML = '❌ 割引額が合計金額を超えています';
+        return;
+      }
+      const discount = appliedCouponDetail.discountValue;
+      discounted = total - discount;
     } else {
+      // ★ パーセント割引
+      if (appliedCouponDetail.discountValue >= 100) {
+        alert('クーポンの割引率（' + appliedCouponDetail.discountValue + '%）が100%を超えています。');
+        document.getElementById('coupon-status').innerHTML = '❌ 割引率が100%を超えています';
+        return;
+      }
       discounted = Math.floor(total * (1 - appliedCouponDetail.discountValue / 100));
     }
+    
+    // ★ 0 になることは絶対にない（上でエラーチェック済み）
     document.getElementById('buy-total-price').innerText = discounted.toLocaleString();
     document.getElementById('coupon-discount-info').innerHTML = `🪙 クーポン割引: -${(total - discounted).toLocaleString()} CR`;
+    console.log(`💰 クーポン適用後の合計: ${discounted} CR`);
+    
   } else {
     document.getElementById('buy-total-price').innerText = total.toLocaleString();
     document.getElementById('coupon-discount-info').innerHTML = '';
@@ -1226,52 +1271,79 @@ function calculateTotalPriceWithCoupon() {
 }
 
     // 購入実行（クーポン適用対応）
-    async function executePurchase() {
-      if (!window.currentUser) return alert("購入にはログインが必要です");
-      const grade = document.getElementById('buy-grade').value;
-      const color = document.getElementById('buy-color').value;
-      const options = [];
-      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
-      const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
+async function executePurchase() {
+  if (!window.currentUser) {
+    alert("購入にはログインが必要です");
+    return;
+  }
+  
+  const grade = document.getElementById('buy-grade').value;
+  const color = document.getElementById('buy-color').value;
+  const options = [];
+  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
+  
+  // ★★★ 合計金額を再計算して取得（確実に最新の値を取得） ★★★
+  // クーポンが適用されているかどうかで分岐
+  if (appliedCouponDetail) {
+    calculateTotalPriceWithCoupon();
+  } else {
+    calculateTotalPrice();
+  }
+  
+  const totalDisplay = document.getElementById('buy-total-price');
+  const totalPrice = Number(totalDisplay.innerText.replace(/,/g, ''));
+  
+  if (isNaN(totalPrice) || totalPrice <= 0) {
+    alert("合計金額が正しくありません。再度お試しください。");
+    return;
+  }
+  
+  console.log('📦 購入実行: 合計=' + totalPrice + ', クーポン=' + (appliedCouponDetail ? appliedCouponDetail.code : 'なし'));
 
-      // ★ クーポン情報を取得
-      let appliedCouponCode = null;
-      if (appliedCouponDetail) {
-        appliedCouponCode = appliedCouponDetail.code;
+  // ★ クーポン情報を取得
+  let appliedCouponCode = null;
+  if (appliedCouponDetail) {
+    appliedCouponCode = appliedCouponDetail.code;
+  }
+
+  // Twitter DM 連携（contactTypeがtwitterの場合）
+  if (currentCarDetail.contactType === 'twitter') {
+    const twitterId = currentCarDetail.maker?.twitterId;
+    if (twitterId) {
+      const cleanId = twitterId.replace(/^@/, '');
+      const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
+      try {
+        await navigator.clipboard.writeText(message);
+        alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
+      } catch (e) {
+        alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
       }
-
-      // Twitter DM 連携（contactTypeがtwitterの場合）
-      if (currentCarDetail.contactType === 'twitter') {
-        const twitterId = currentCarDetail.maker?.twitterId;
-        if (twitterId) {
-          const cleanId = twitterId.replace(/^@/, '');
-          const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
-          try {
-            await navigator.clipboard.writeText(message);
-            alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
-          } catch (e) {
-            alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
-          }
-          window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
-        } else {
-          alert('メーカーのTwitter IDが未設定です。');
-        }
-      }
-
-      // ★ ポータル内注文作成（クーポンコードを送信）
-      const res = await callGasApi('createOrder', {
-        carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
-        makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-        buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
-        gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName,
-        appliedCouponCode: appliedCouponCode
-      });
-
-      if (res) {
-        alert(res.message);
-        closeModal('detail-modal');
-      }
+      window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
+    } else {
+      alert('メーカーのTwitter IDが未設定です。');
     }
+  }
+
+  // ★ ポータル内注文作成（クーポンコードを送信）
+  const res = await callGasApi('createOrder', {
+    carId: currentCarDetail.carId,
+    makerId: currentCarDetail.makerId,
+    makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+    buyerUid: window.currentUser.uid,
+    buyerName: window.currentUser.displayName || window.currentUser.email,
+    gradeName: grade,
+    colorName: color,
+    options: options,
+    totalPrice: totalPrice,
+    carName: currentCarDetail.carName,
+    appliedCouponCode: appliedCouponCode
+  });
+
+  if (res) {
+    alert(res.message);
+    closeModal('detail-modal');
+  }
+}
 
     async function deleteCar(carId) {
       if (!confirm("この車両を削除してもよろしいですか？")) return;
