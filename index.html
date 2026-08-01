@@ -431,31 +431,7 @@
   </div>
 
   <!-- ★★★ 追加: セール編集モーダル ★★★ -->
-  <div id="edit-sale-modal" class="modal">
-    <div class="modal-content">
-      <h3 id="edit-sale-title">セール編集</h3>
-      <input type="hidden" id="edit-sale-id">
-      <div class="form-group"><label>対象車両ID</label><input type="text" id="edit-sale-car-id"></div>
-      <div class="form-group">
-        <label>対象タイプ</label>
-        <select id="edit-sale-target-type"><option value="total">合計金額</option><option value="parts">パーツ単位</option></select>
-      </div>
-      <div class="form-group"><label>対象ID（パーツのdetailId）</label><input type="text" id="edit-sale-target-id"></div>
-      <div class="form-group">
-        <label>割引タイプ</label>
-        <select id="edit-sale-type"><option value="fixed">固定額</option><option value="percent">パーセント</option></select>
-      </div>
-      <div class="form-group"><label>割引額</label><input type="number" id="edit-sale-value"></div>
-      <div class="form-group"><label>開始日</label><input type="date" id="edit-sale-start"></div>
-      <div class="form-group"><label>終了日</label><input type="date" id="edit-sale-end"></div>
-      <div class="form-group">
-        <label>有効</label>
-        <select id="edit-sale-active"><option value="true">有効</option><option value="false">無効</option></select>
-      </div>
-      <button class="btn" onclick="saveEditSale()">保存</button>
-      <button class="btn btn-secondary" onclick="closeModal('edit-sale-modal')">キャンセル</button>
-    </div>
-  </div>
+
 
   <!-- Firebase モジュール SDK (v10) -->
   <script type="module">
@@ -1437,58 +1413,9 @@ async function loadMypageData() {
       <h3>📋 発行済みクーポン</h3>
       <div id="coupons-list-container"></div>
     </div>
-
-    <!-- セール設定 -->
-    <hr style="border-color: #333; margin: 20px 0;">
-    <div id="sale-management">
-      <h3>🔥 セール設定（自社車両対象）</h3>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
-        <select id="sale-car-select" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-          ${carOptions}
-        </select>
-        <select id="sale-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;" onchange="toggleSalePartSelect()">
-          <option value="total">合計金額割引</option>
-          <option value="parts">パーツ単位割引</option>
-        </select>
-        <div id="sale-part-select-container" style="display:none; grid-column: span 2;">
-          <select id="sale-part-select" style="width:100%; padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-            <option value="">-- パーツを選択 --</option>
-          </select>
-        </div>
-        <select id="sale-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-          <option value="fixed">固定額</option>
-          <option value="percent">パーセント</option>
-        </select>
-        <input type="number" id="sale-value" placeholder="割引額" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-        <label style="color:#aaa; font-size:0.8rem; align-self:center;">開始日</label>
-        <input type="date" id="sale-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-        <label style="color:#aaa; font-size:0.8rem; align-self:center;">終了日</label>
-        <input type="date" id="sale-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-        <button class="btn" onclick="setSale()" style="grid-column: span 2;">セールを設定</button>
-      </div>
-    </div>
-
-    <!-- 設定済みセール一覧 -->
-    <hr style="border-color: #333; margin: 20px 0;">
-    <div id="my-sales-list">
-      <h3>📋 設定済みセール</h3>
-      <div id="sales-list-container"></div>
-    </div>
   `;
 
   statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
-
-  // ★ 車両選択時にパーツリストを更新するイベント
-  document.getElementById('sale-car-select').addEventListener('change', function() {
-    updateSalePartsList(this.value);
-  });
-
-  // ★ パーツ単位選択時に表示を切り替え
-  window.toggleSalePartSelect = function() {
-    const container = document.getElementById('sale-part-select-container');
-    const targetType = document.getElementById('sale-target-type').value;
-    container.style.display = (targetType === 'parts') ? 'block' : 'none';
-  };
 
   // 注文・通知一覧（既存）
   const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
@@ -1511,38 +1438,6 @@ async function loadMypageData() {
 
   // クーポン・セール一覧読み込み
   loadMyCoupons();
-  loadMySales(maker.makerId);
-}
-
-// ★ 車両選択時にパーツリストを更新する関数
-async function updateSalePartsList(carId) {
-  const partSelect = document.getElementById('sale-part-select');
-  if (!carId) {
-    partSelect.innerHTML = '<option value="">-- 車両を先に選択 --</option>';
-    return;
-  }
-  const car = await callGasApi('getCarDetail', { carId: carId });
-  if (!car) return;
-  let options = '<option value="">-- パーツを選択 --</option>';
-  // グレード
-  if (car.grades && car.grades.length) {
-    car.grades.forEach(g => {
-      options += `<option value="${g.gradeId}">グレード: ${g.gradeName}</option>`;
-    });
-  }
-  // カラー
-  if (car.colors && car.colors.length) {
-    car.colors.forEach(c => {
-      options += `<option value="${c.colorId}">カラー: ${c.colorName}</option>`;
-    });
-  }
-  // オプション
-  if (car.options && car.options.length) {
-    car.options.forEach(o => {
-      options += `<option value="${o.optionId}">オプション: ${o.optionName}</option>`;
-    });
-  }
-  partSelect.innerHTML = options;
 }
 
 // ★★★ クーポン対象切り替え ★★★
@@ -1701,124 +1596,6 @@ async function saveEditCoupon() {
     alert(res.message);
     closeModal('edit-coupon-modal');
     loadMyCoupons();
-  }
-}
-
-// ★★★ セール設定 ★★★
-// ★★★ セール設定 ★★★
-async function setSale() {
-  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-  if (!maker) return alert("メーカー登録が必要です");
-
-  const carId = document.getElementById('sale-car-select').value;
-  if (!carId) return alert("対象車両を選択してください");
-
-  const targetType = document.getElementById('sale-target-type').value;
-  let targetId = '';
-  if (targetType === 'parts') {
-    targetId = document.getElementById('sale-part-select').value;
-    if (!targetId) return alert("パーツを選択してください");
-  }
-
-  const payload = {
-    carId: carId,
-    targetType: targetType,
-    targetId: targetId,
-    discountType: document.getElementById('sale-type').value,
-    discountValue: Number(document.getElementById('sale-value').value),
-    startDate: document.getElementById('sale-start').value,
-    endDate: document.getElementById('sale-end').value
-  };
-
-  // 日付チェック
-  if (!payload.startDate || !payload.endDate) return alert("開始日と終了日を入力してください");
-  if (payload.startDate > payload.endDate) return alert("開始日が終了日より後になっています");
-
-  const res = await callGasApi('saveSale', payload);
-  if (res) {
-    alert(res.message);
-    loadMySales(maker.makerId);
-  }
-}
-// ★★★ 設定済みセール一覧 ★★★
-async function loadMySales(makerId) {
-  const sales = await callGasApi('getMySales', { makerId: makerId });
-  const container = document.getElementById('sales-list-container');
-  if (!container) return;
-  if (!sales || sales.length === 0) {
-    container.innerHTML = `<p style="color:#888;">設定したセールはありません。</p>`;
-    return;
-  }
-  container.innerHTML = sales.map(s => `
-    <div class="notif-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-      <div>
-        <strong>車両: ${s.carName}</strong>
-        ${s.targetType === 'parts' ? `<br>対象パーツ: ${s.partName || s.targetId}` : ''}
-        <br>割引: ${s.discountType === 'fixed' ? s.discountValue + 'CR OFF' : s.discountValue + '% OFF'}
-        <br>有効期間: ${s.startDate} 〜 ${s.endDate}
-        <span style="color:${s.isActive ? '#4caf50' : '#f44336'};">${s.isActive ? '有効' : '無効'}</span>
-      </div>
-      <div style="display:flex; gap:5px;">
-        <button class="btn btn-secondary" style="font-size:0.8rem; padding:4px 10px;" onclick="editSale('${s.saleId}')">編集</button>
-        <button class="btn btn-danger" style="font-size:0.8rem; padding:4px 10px;" onclick="deleteSale('${s.saleId}')">削除</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ★★★ セール削除 ★★★
-async function deleteSale(saleId) {
-  if (!confirm("このセールを削除しますか？")) return;
-  const res = await callGasApi('deleteSale', { saleId: saleId });
-  if (res) {
-    alert(res.message);
-    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-    if (maker) loadMySales(maker.makerId);
-  }
-}
-
-// ★★★ セール編集（モーダル版） ★★★
-function editSale(saleId) {
-  const maker = window.currentUser ? window.currentUser.uid : '';
-  callGasApi('getMakerByUid', { uid: maker }).then(makerData => {
-    if (!makerData) return alert("メーカー情報がありません");
-    callGasApi('getMySales', { makerId: makerData.makerId }).then(sales => {
-      const sale = sales.find(s => s.saleId === saleId);
-      if (!sale) return alert("セールが見つかりません");
-      document.getElementById('edit-sale-id').value = sale.saleId;
-      document.getElementById('edit-sale-car-id').value = sale.carId || '';
-      document.getElementById('edit-sale-target-type').value = sale.targetType || 'total';
-      document.getElementById('edit-sale-target-id').value = sale.targetId || '';
-      document.getElementById('edit-sale-type').value = sale.discountType || 'fixed';
-      document.getElementById('edit-sale-value').value = sale.discountValue || 0;
-      document.getElementById('edit-sale-start').value = sale.startDate || '';
-      document.getElementById('edit-sale-end').value = sale.endDate || '';
-      document.getElementById('edit-sale-active').value = sale.isActive ? 'true' : 'false';
-      document.getElementById('edit-sale-modal').style.display = 'flex';
-    });
-  });
-}
-
-// ★★★ セール保存（モーダル版） ★★★
-async function saveEditSale() {
-  const payload = {
-    saleId: document.getElementById('edit-sale-id').value,
-    carId: document.getElementById('edit-sale-car-id').value.trim(),
-    targetType: document.getElementById('edit-sale-target-type').value,
-    targetId: document.getElementById('edit-sale-target-id').value.trim(),
-    discountType: document.getElementById('edit-sale-type').value,
-    discountValue: Number(document.getElementById('edit-sale-value').value),
-    startDate: document.getElementById('edit-sale-start').value,
-    endDate: document.getElementById('edit-sale-end').value,
-    isActive: document.getElementById('edit-sale-active').value === 'true'
-  };
-  if (!payload.carId) return alert("対象車両IDを入力してください");
-  const res = await callGasApi('updateSale', payload);
-  if (res) {
-    alert(res.message);
-    closeModal('edit-sale-modal');
-    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-    if (maker) loadMySales(maker.makerId);
   }
 }
 
