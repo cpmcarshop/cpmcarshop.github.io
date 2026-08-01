@@ -413,6 +413,18 @@
         <label>有効</label>
         <select id="edit-coupon-active"><option value="true">有効</option><option value="false">無効</option></select>
       </div>
+      <!-- ★★★ 追加: 編集モーダルに対象選択を追加 ★★★ -->
+      <div class="form-group">
+        <label>対象</label>
+        <select id="edit-coupon-target-type" onchange="toggleEditCouponTarget()">
+          <option value="maker">自社の全車両</option>
+          <option value="car">特定の車両</option>
+        </select>
+      </div>
+      <div class="form-group" id="edit-coupon-target-car-container" style="display:none;">
+        <label>対象車両</label>
+        <select id="edit-coupon-target-car"><option value="">-- 選択 --</option></select>
+      </div>
       <button class="btn" onclick="saveEditCoupon()">保存</button>
       <button class="btn btn-secondary" onclick="closeModal('edit-coupon-modal')">キャンセル</button>
     </div>
@@ -1294,12 +1306,17 @@ async function loadMypageData() {
         <input type="date" id="coupon-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <input type="date" id="coupon-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <input type="number" id="coupon-min" placeholder="最小注文額（任意）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-        <!-- ★★★ 追加: クーポン対象選択 ★★★ -->
-        <select id="coupon-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-          <option value="all">すべての車両</option>
-          <option value="maker">自社車両のみ</option>
+        <!-- ★★★ 追加: クーポン対象選択（すべての車両を削除） ★★★ -->
+        <select id="coupon-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;" onchange="toggleCouponTarget()">
+          <option value="maker">自社の全車両</option>
+          <option value="car">特定の車両</option>
         </select>
-        <input type="text" id="coupon-target-id" placeholder="対象ID（任意）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <div id="coupon-target-car-container" style="display:none; grid-column: span 2;">
+          <select id="coupon-target-car" style="width:100%; padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+            <option value="">-- 車両を選択 --</option>
+            ${myCars.map(c => `<option value="${c.carId}">${c.carName}</option>`).join('')}
+          </select>
+        </div>
         <button class="btn" onclick="publishCoupon()" style="grid-column: span 2;">クーポンを発行</button>
       </div>
     </div>
@@ -1418,10 +1435,38 @@ async function updateSalePartsList(carId) {
   partSelect.innerHTML = options;
 }
 
-// ★★★ クーポン発行関数 ★★★
+// ★★★ クーポン対象切り替え ★★★
+function toggleCouponTarget() {
+  const targetType = document.getElementById('coupon-target-type').value;
+  const carContainer = document.getElementById('coupon-target-car-container');
+  if (carContainer) {
+    carContainer.style.display = (targetType === 'car') ? 'block' : 'none';
+  }
+}
+
+// ★★★ 編集モーダル対象切り替え ★★★
+function toggleEditCouponTarget() {
+  const targetType = document.getElementById('edit-coupon-target-type').value;
+  const container = document.getElementById('edit-coupon-target-car-container');
+  if (container) {
+    container.style.display = (targetType === 'car') ? 'block' : 'none';
+  }
+}
+
+// ★★★ クーポン発行関数（修正） ★★★
 async function publishCoupon() {
   const code = document.getElementById('coupon-code').value.trim();
   if (!code) return alert("クーポンコードを入力してください");
+  const targetType = document.getElementById('coupon-target-type').value;
+  let targetId = '';
+  if (targetType === 'maker') {
+    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+    if (!maker) return alert("メーカー情報がありません");
+    targetId = maker.makerId;
+  } else if (targetType === 'car') {
+    targetId = document.getElementById('coupon-target-car').value;
+    if (!targetId) return alert("対象車両を選択してください");
+  }
   const payload = {
     code: code,
     description: document.getElementById('coupon-desc').value,
@@ -1430,8 +1475,8 @@ async function publishCoupon() {
     minOrderAmount: Number(document.getElementById('coupon-min').value) || 0,
     startDate: document.getElementById('coupon-start').value,
     endDate: document.getElementById('coupon-end').value,
-    targetType: document.getElementById('coupon-target-type').value, // ★ 修正: 対象タイプを取得
-    targetId: document.getElementById('coupon-target-id').value || '', // ★ 追加: 対象IDを取得
+    targetType: targetType,
+    targetId: targetId,
     issuedBy: window.currentUser.uid
   };
   const res = await callGasApi('saveCoupon', payload);
@@ -1480,7 +1525,7 @@ async function deleteCoupon(couponId) {
   }
 }
 
-// ★★★ クーポン編集（モーダル版） ★★★
+// ★★★ クーポン編集（モーダル版）修正 ★★★
 function editCoupon(couponId) {
   // 現在のデータを取得してモーダルにセット
   const maker = window.currentUser ? window.currentUser.uid : '';
@@ -1496,12 +1541,37 @@ function editCoupon(couponId) {
     document.getElementById('edit-coupon-start').value = coupon.startDate || '';
     document.getElementById('edit-coupon-end').value = coupon.endDate || '';
     document.getElementById('edit-coupon-active').value = coupon.isActive ? 'true' : 'false';
+    // ★★★ 対象情報をセット ★★★
+    document.getElementById('edit-coupon-target-type').value = coupon.targetType || 'maker';
+    if (coupon.targetType === 'car') {
+      // 車両リストを取得して選択肢を生成
+      callGasApi('getMakerByUid', { uid: window.currentUser.uid }).then(maker => {
+        if (maker) {
+          callGasApi('getCars', { makerId: maker.makerId }).then(cars => {
+            const select = document.getElementById('edit-coupon-target-car');
+            select.innerHTML = '<option value="">-- 選択 --</option>' + cars.map(c => `<option value="${c.carId}" ${c.carId === coupon.targetId ? 'selected' : ''}>${c.carName}</option>`).join('');
+            document.getElementById('edit-coupon-target-car-container').style.display = 'block';
+          });
+        }
+      });
+    } else {
+      document.getElementById('edit-coupon-target-car-container').style.display = 'none';
+    }
     document.getElementById('edit-coupon-modal').style.display = 'flex';
   });
 }
 
-// ★★★ クーポン保存（モーダル版） ★★★
+// ★★★ クーポン保存（モーダル版）修正 ★★★
 async function saveEditCoupon() {
+  const targetType = document.getElementById('edit-coupon-target-type').value;
+  let targetId = '';
+  if (targetType === 'maker') {
+    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+    if (maker) targetId = maker.makerId;
+  } else if (targetType === 'car') {
+    targetId = document.getElementById('edit-coupon-target-car').value;
+    if (!targetId) return alert("対象車両を選択してください");
+  }
   const payload = {
     couponId: document.getElementById('edit-coupon-id').value,
     code: document.getElementById('edit-coupon-code').value.trim(),
@@ -1509,8 +1579,8 @@ async function saveEditCoupon() {
     discountType: document.getElementById('edit-coupon-type').value,
     discountValue: Number(document.getElementById('edit-coupon-value').value),
     minOrderAmount: Number(document.getElementById('edit-coupon-min').value) || 0,
-    targetType: 'all',
-    targetId: '',
+    targetType: targetType,
+    targetId: targetId,
     startDate: document.getElementById('edit-coupon-start').value,
     endDate: document.getElementById('edit-coupon-end').value,
     isActive: document.getElementById('edit-coupon-active').value === 'true'
