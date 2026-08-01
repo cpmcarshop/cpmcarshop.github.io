@@ -458,7 +458,16 @@
   <!-- Firebase モジュール SDK (v10) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut,
+  getRedirectResult   // ← 追加
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     // Firebase 設定
     const firebaseConfig = {
@@ -478,6 +487,15 @@
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
     window.signOut = signOut;
+
+    // リダイレクト結果の処理
+getRedirectResult(auth)
+  .then((result) => {
+    if (result) closeModal('auth-modal');
+  })
+  .catch((error) => {
+    console.error('リダイレクトエラー:', error);
+  });
 
     onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -662,25 +680,40 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
     });
 
     // Google認証
-    function handleGoogleAuth() {
-      const provider = new window.GoogleAuthProvider();
-      window.signInWithPopup(window.firebaseAuth, provider).then(() => closeModal('auth-modal'));
-    }
 
     // メール認証
-    function handleEmailAuth(type) {
-      const email = document.getElementById('auth-email').value;
-      const pass = document.getElementById('auth-password').value;
-      if (!email || !pass) return alert("メアドとパスワードを入力してください");
-
-      if (type === 'login') {
-        window.signInWithEmailAndPassword(window.firebaseAuth, email, pass).then(() => closeModal('auth-modal')).catch(e => alert(e.message));
-      } else {
-        window.createUserWithEmailAndPassword(window.firebaseAuth, email, pass).then(() => closeModal('auth-modal')).catch(e => alert(e.message));
-      }
-    }
-
+  function handleGoogleAuth() {
+  const provider = new window.GoogleAuthProvider();
   
+  // まずポップアップを試みる
+  window.signInWithPopup(window.firebaseAuth, provider)
+    .then(() => closeModal('auth-modal'))
+    .catch((error) => {
+      // ポップアップがブロックされた場合やユーザーが閉じた場合
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+        // リダイレクト方式にフォールバック
+        window.signInWithRedirect(window.firebaseAuth, provider);
+      } else {
+        alert('ログインエラー: ' + error.message);
+      }
+    });
+}
+
+    function handleEmailAuth(type) {
+  const email = document.getElementById('auth-email').value;
+  const pass = document.getElementById('auth-password').value;
+  if (!email || !pass) return alert("メアドとパスワードを入力してください");
+
+  if (type === 'login') {
+    window.signInWithEmailAndPassword(window.firebaseAuth, email, pass)
+      .then(() => closeModal('auth-modal'))
+      .catch(e => alert(e.message));
+  } else {
+    window.createUserWithEmailAndPassword(window.firebaseAuth, email, pass)
+      .then(() => closeModal('auth-modal'))
+      .catch(e => alert(e.message));
+  }
+}
 // ホームタブ読み込み（初期表示用）
 // ホームタブ読み込み（viewCount降順で表示）
 async function loadHomeCars(force = false) {
@@ -1268,48 +1301,73 @@ function calculateTotalPriceWithCoupon() {
   }
 }
 
-    // 購入実行（クーポン適用対応）
 async function executePurchase() {
-  // ★ 確認ダイアログ（追加）
-  if (!confirm("注文をしてもよろしいですか？")) {
-    return;
-  }
-
+  if (!confirm("注文をしてもよろしいですか？")) return;
   if (!window.currentUser) {
     alert("購入にはログインが必要です");
     return;
   }
-  
+
   const grade = document.getElementById('buy-grade').value;
   const color = document.getElementById('buy-color').value;
   const options = [];
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
-  
-  // 合計金額を再計算（クーポン適用状況に応じて）
+
+  // 合計金額計算
   if (appliedCouponDetail) {
     calculateTotalPriceWithCoupon();
   } else {
     calculateTotalPrice();
   }
-  
-  const totalDisplay = document.getElementById('buy-total-price');
-  const totalPrice = Number(totalDisplay.innerText.replace(/,/g, ''));
-  
+  const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
   if (isNaN(totalPrice) || totalPrice <= 0) {
-    alert("合計金額が正しくありません。再度お試しください。");
+    alert("合計金額が正しくありません。");
     return;
   }
+  const appliedCouponCode = appliedCouponDetail ? appliedCouponDetail.code : null;
 
-  let appliedCouponCode = null;
-  if (appliedCouponDetail) {
-    appliedCouponCode = appliedCouponDetail.code;
+  // ★★★ Twitter DM の場合 ★★★
+  if (currentCarDetail.contactType === 'twitter') {
+    const orderRes = await callGasApi('createOrder', {
+      carId: currentCarDetail.carId,
+      makerId: currentCarDetail.makerId,
+      makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+      buyerUid: window.currentUser.uid,
+      buyerName: window.currentUser.displayName || window.currentUser.email,
+      gradeName: grade,
+      colorName: color,
+      options: options,
+      totalPrice: totalPrice,
+      carName: currentCarDetail.carName,
+      appliedCouponCode: appliedCouponCode
+    });
+
+    if (!orderRes) {
+      alert('注文の作成に失敗しました。');
+      return;
+    }
+
+    const twitterId = currentCarDetail.maker?.twitterId;
+    if (!twitterId) {
+      alert('メーカーのTwitter IDが未設定です。');
+      return;
+    }
+    const cleanId = twitterId.replace(/^@/, '');
+    const message = 
+`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
+【注文ID: ${orderRes.orderId}】
+車種: ${currentCarDetail.carName}
+グレード: ${grade}
+カラー: ${color}
+オプション: ${options.join(', ') || 'なし'}
+合計: ${totalPrice.toLocaleString()} CR`;
+
+    openTwitterDmModal(message, cleanId, orderRes.orderId);
+    return; // ★ ここで終了
   }
 
-  // ★ Twitter DM の場合の処理を変更
- // ★ Twitter DM の場合の処理（注文を先に作成）
-if (currentCarDetail.contactType === 'twitter') {
-  // 1. ポータル側に注文を作成
-  const orderRes = await callGasApi('createOrder', {
+  // ★★★ ポータル注文（通常） ★★★
+  const res = await callGasApi('createOrder', {
     carId: currentCarDetail.carId,
     makerId: currentCarDetail.makerId,
     makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
@@ -1323,34 +1381,12 @@ if (currentCarDetail.contactType === 'twitter') {
     appliedCouponCode: appliedCouponCode
   });
 
-  if (!orderRes) {
-    alert('注文の作成に失敗しました。');
-    return;
+  if (res) {
+    alert(res.message);
+    closeModal('detail-modal');
   }
-
-  // 2. メーカーのTwitter IDを取得
-  const twitterId = currentCarDetail.maker?.twitterId;
-  if (!twitterId) {
-    alert('メーカーのTwitter IDが未設定です。');
-    return;
-  }
-  const cleanId = twitterId.replace(/^@/, '');
-
-  // 3. DM用メッセージ（注文IDを含める）
-  const message = 
-`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
-【注文ID: ${orderRes.orderId}】
-車種: ${currentCarDetail.carName}
-グレード: ${grade}
-カラー: ${color}
-オプション: ${options.join(', ') || 'なし'}
-合計: ${totalPrice.toLocaleString()} CR`;
-
-  // 4. DMモーダルを開く（注文IDも渡す）
-  openTwitterDmModal(message, cleanId, orderRes.orderId);
-  return; // ここで終了（モーダルが開いたら処理完了）
 }
-}
+
     async function deleteCar(carId) {
       if (!confirm("この車両を削除してもよろしいですか？")) return;
       const res = await callGasApi('deleteCar', { carId: carId });
