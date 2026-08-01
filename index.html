@@ -197,6 +197,10 @@
   background: #cd7f32;
   color: #fff;
 }
+    /* Twitter DMモーダル内のテキストエリア */
+#dm-message {
+  font-family: inherit;
+}
   </style>
 </head>
 <body>
@@ -393,6 +397,23 @@
       <button class="btn btn-secondary" onclick="closeModal('auth-modal')">閉じる</button>
     </div>
   </div>
+
+  <!-- Twitter DM 送信用モーダル -->
+<div id="twitter-dm-modal" class="modal">
+  <div class="modal-content">
+    <h3>メーカーへDMを送信</h3>
+    <p>以下の内容を確認し、DMで送信してください。</p>
+    <div class="form-group">
+      <label>メッセージ内容（編集可能）</label>
+      <textarea id="dm-message" rows="6" style="width:100%; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px; padding:8px;"></textarea>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn" onclick="copyDmMessage()">📋 コピー</button>
+      <button class="btn" onclick="sendDm()" style="background:#1DA1F2; color:#fff;">🐦 DMをする</button>
+      <button class="btn btn-secondary" onclick="closeModal('twitter-dm-modal')">閉じる</button>
+    </div>
+  </div>
+</div>
 
   <!-- ★★★ 追加: クーポン編集モーダル ★★★ -->
   <div id="edit-coupon-modal" class="modal">
@@ -1248,6 +1269,11 @@ function calculateTotalPriceWithCoupon() {
 
     // 購入実行（クーポン適用対応）
 async function executePurchase() {
+  // ★ 確認ダイアログ（追加）
+  if (!confirm("注文をしてもよろしいですか？")) {
+    return;
+  }
+
   if (!window.currentUser) {
     alert("購入にはログインが必要です");
     return;
@@ -1258,8 +1284,7 @@ async function executePurchase() {
   const options = [];
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
   
-  // ★★★ 合計金額を再計算して取得（確実に最新の値を取得） ★★★
-  // クーポンが適用されているかどうかで分岐
+  // 合計金額を再計算（クーポン適用状況に応じて）
   if (appliedCouponDetail) {
     calculateTotalPriceWithCoupon();
   } else {
@@ -1273,34 +1298,35 @@ async function executePurchase() {
     alert("合計金額が正しくありません。再度お試しください。");
     return;
   }
-  
-  console.log('📦 購入実行: 合計=' + totalPrice + ', クーポン=' + (appliedCouponDetail ? appliedCouponDetail.code : 'なし'));
 
-  // ★ クーポン情報を取得
   let appliedCouponCode = null;
   if (appliedCouponDetail) {
     appliedCouponCode = appliedCouponDetail.code;
   }
 
-  // Twitter DM 連携（contactTypeがtwitterの場合）
+  // ★ Twitter DM の場合の処理を変更
   if (currentCarDetail.contactType === 'twitter') {
     const twitterId = currentCarDetail.maker?.twitterId;
-    if (twitterId) {
-      const cleanId = twitterId.replace(/^@/, '');
-      const message = `${currentCarDetail.contactDetail}\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ') || 'なし'}\n合計: ${totalPrice.toLocaleString()} CR`;
-      try {
-        await navigator.clipboard.writeText(message);
-        alert('注文内容をクリップボードにコピーしました。DMでメーカーに送信してください。');
-      } catch (e) {
-        alert('以下の内容をコピーしてDMでメーカーに送信してください：\n\n' + message);
-      }
-      window.open(`https://twitter.com/direct_messages/create/${cleanId}`, '_blank');
-    } else {
+    if (!twitterId) {
       alert('メーカーのTwitter IDが未設定です。');
+      return;
     }
+    // メッセージ作成
+    const cleanId = twitterId.replace(/^@/, '');
+    const message = 
+`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
+車種: ${currentCarDetail.carName}
+グレード: ${grade}
+カラー: ${color}
+オプション: ${options.join(', ') || 'なし'}
+合計: ${totalPrice.toLocaleString()} CR`;
+
+    // ★ DM送信モーダルを表示
+    openTwitterDmModal(message, cleanId);
+    return; // ここで終了（DMモーダルでポータル注文は別途作成するかは任意）
   }
 
-  // ★ ポータル内注文作成（クーポンコードを送信）
+  // ★ ポータル内注文作成（Twitter以外の場合）
   const res = await callGasApi('createOrder', {
     carId: currentCarDetail.carId,
     makerId: currentCarDetail.makerId,
@@ -1439,7 +1465,37 @@ async function loadMypageData() {
   // クーポン・セール一覧読み込み
   loadMyCoupons();
 }
+// DMモーダルを開く
+let dmTargetTwitterId = '';
 
+function openTwitterDmModal(message, twitterId) {
+  document.getElementById('dm-message').value = message;
+  dmTargetTwitterId = twitterId;
+  document.getElementById('twitter-dm-modal').style.display = 'flex';
+}
+
+// コピー機能
+function copyDmMessage() {
+  const text = document.getElementById('dm-message').value;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('メッセージをクリップボードにコピーしました。');
+  }).catch(() => {
+    // 代替手段
+    const textarea = document.getElementById('dm-message');
+    textarea.select();
+    document.execCommand('copy');
+    alert('メッセージをクリップボードにコピーしました。');
+  });
+}
+
+// DM送信（Twitterへ遷移）
+function sendDm() {
+  const message = encodeURIComponent(document.getElementById('dm-message').value);
+  const url = `https://twitter.com/direct_messages/create/${dmTargetTwitterId}?text=${message}`;
+  window.open(url, '_blank');
+  // モーダルを閉じる（任意）
+  closeModal('twitter-dm-modal');
+}
 // ★★★ クーポン対象切り替え ★★★
 function toggleCouponTarget() {
   const targetType = document.getElementById('coupon-target-type').value;
