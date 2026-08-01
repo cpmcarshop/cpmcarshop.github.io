@@ -214,12 +214,14 @@
   </div>
 
   <header>
-    <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
-    <div>
-      <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
-      <button class="btn" id="auth-btn">ログイン / 登録</button>
-    </div>
-  </header>
+  <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
+  <div>
+    <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
+    <!-- ★ お問い合わせボタン（追加） -->
+    <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">お問い合わせ</button>
+    <button class="btn" id="auth-btn">ログイン / 登録</button>
+  </div>
+</header>
 
   <nav class="tab-menu">
     <button class="tab-button active" id="tab-btn-home" onclick="switchTab('home')">ホーム</button>
@@ -677,7 +679,14 @@ async function executeSearch() {
   currentSort = document.getElementById('search-sort').value;
   applySortAndRender();
 }
-
+// お問い合わせボタンの処理（将来Googleフォームに変更予定）
+function openContact() {
+  // 現在は仮のリンク（後でGoogleフォームのURLに差し替え）
+  window.open('https://forms.google.com/your-form-url', '_blank');
+  // または、以下のようにアラートを表示してからフォームを開くことも可能
+  // alert('お問い合わせフォームを開きます。');
+  // window.open('https://forms.google.com/your-form-url', '_blank');
+}
 // ソート適用関数（新規追加）
 function applySortAndRender() {
   if (currentSearchResults.length === 0) return;
@@ -713,7 +722,13 @@ function resetSearchFilter() {
   currentSort = 'new';
   executeSearch();
 }
-
+// メーカー指定で車両一覧を表示する（メーカー一覧クリック時）
+function filterByMaker(makerId, makerName) {
+  currentSelectedMakerId = makerId;
+  document.getElementById('search-title').innerText = `「${makerName}」の車両一覧`;
+  document.getElementById('reset-search-btn').style.display = 'inline-block';
+  switchTab('search');
+}
 // ソート選択変更イベント（新規追加）
 // 既存の <script> 内の適切な場所に追加（document.addEventListener は既に使われているかもしれないので、直接関数を呼ぶ形でもOK）
 document.getElementById('search-sort').addEventListener('change', function() {
@@ -765,16 +780,40 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
       else if (rank === 3) rankClass += ' rank-3';
       rankBadge = `<span class="${rankClass}">#${rank}</span>`;
     }
+
+    // ★追加: クーポン・セールバッジ
+    let couponBadge = '';
+    if (c.hasCoupon) {
+      couponBadge = `<span style="position:absolute; top:10px; left:10px; background:#ff6b6b; color:#fff; padding:2px 10px; border-radius:4px; font-size:0.7rem; z-index:6;">🪙 クーポン</span>`;
+    }
+    let saleBadge = '';
+    if (c.hasSale) {
+      saleBadge = `<span style="position:absolute; top:10px; left:${c.hasCoupon ? '85px' : '10px'}; background:#ffd93d; color:#000; padding:2px 10px; border-radius:4px; font-size:0.7rem; z-index:6;">🔥 セール</span>`;
+    }
+
+    // ★追加: 価格表示（セール価格がある場合は差し替え）
+    let priceDisplay = '';
+    if (c.salePriceRange) {
+      priceDisplay = `
+        <p style="color:var(--main-color); font-weight:bold; text-decoration:line-through; opacity:0.6;">${c.priceRange}</p>
+        <p style="color:#ff6b6b; font-weight:bold;">${c.salePriceRange}</p>
+      `;
+    } else {
+      priceDisplay = `<p style="color:var(--main-color); font-weight:bold;">${c.priceRange}</p>`;
+    }
+
     return `
       <div class="card">
         ${rankBadge}
+        ${couponBadge}
+        ${saleBadge}
         <span class="card-badge">${c.status}</span>
         <img src="${c.img1 || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
         <div class="card-body">
           <div class="card-subtitle">${c.makerName}</div>
           <h3 class="card-title">${c.carName}</h3>
           <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
-          <p style="color:var(--main-color); font-weight:bold;">${c.priceRange}</p>
+          ${priceDisplay}
           ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
           <div style="display:flex; gap:5px;">
             <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
@@ -933,23 +972,48 @@ async function openCarDetail(carId) {
 
         <h4>1. グレード選択</h4>
         <select id="buy-grade" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
-          ${car.grades.map(g => `<option value="${g.gradeName}" data-price="${g.price}" data-img="${g.imgUrl || ''}">${g.gradeName} (+${Number(g.price).toLocaleString()} CR)</option>`).join('')}
-        </select>
+  ${car.grades.map(g => {
+    // ★追加: セール価格があれば表示を変更
+    let priceDisplay = Number(g.price).toLocaleString() + ' CR';
+    let label = `${g.gradeName} (+${priceDisplay})`;
+    if (g.salePrice !== undefined && g.salePrice !== null) {
+      const saleDisplay = Number(g.salePrice).toLocaleString() + ' CR';
+      label = `${g.gradeName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
+    }
+    return `<option value="${g.gradeName}" data-price="${g.salePrice !== undefined && g.salePrice !== null ? g.salePrice : g.price}" data-img="${g.imgUrl || ''}">${label}</option>`;
+  }).join('')}
+</select>
         <div id="grade-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
         <h4>2. カラー選択</h4>
         <select id="buy-color" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
-          ${car.colors.map(c => `<option value="${c.colorName}" data-price="${c.price}" data-img="${c.imgUrl || ''}">${c.colorName} (+${Number(c.price).toLocaleString()} CR)</option>`).join('')}
-        </select>
+  ${car.colors.map(c => {
+    let priceDisplay = Number(c.price).toLocaleString() + ' CR';
+    let label = `${c.colorName} (+${priceDisplay})`;
+    if (c.salePrice !== undefined && c.salePrice !== null) {
+      const saleDisplay = Number(c.salePrice).toLocaleString() + ' CR';
+      label = `${c.colorName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
+    }
+    return `<option value="${c.colorName}" data-price="${c.salePrice !== undefined && c.salePrice !== null ? c.salePrice : c.price}" data-img="${c.imgUrl || ''}">${label}</option>`;
+  }).join('')}
+</select>
         <div id="color-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
         <h4>3. オプション選択</h4>
-        ${car.options.map((o, idx) => `
-          <div>
-            <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.price}" data-img="${o.imgUrl || ''}" onchange="updateSubImageDisplay(); calculateTotalPrice();">
-            <label for="opt-${idx}">${o.optionName} (+${Number(o.price).toLocaleString()} CR) - ${o.description}</label>
-          </div>
-        `).join('')}
+        ${car.options.map((o, idx) => {
+  let priceDisplay = Number(o.price).toLocaleString() + ' CR';
+  let label = `${o.optionName} (+${priceDisplay}) - ${o.description}`;
+  if (o.salePrice !== undefined && o.salePrice !== null) {
+    const saleDisplay = Number(o.salePrice).toLocaleString() + ' CR';
+    label = `${o.optionName} (${saleDisplay} ＜通常 ${priceDisplay}＞) - ${o.description}`;
+  }
+  return `
+    <div>
+      <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.salePrice !== undefined && o.salePrice !== null ? o.salePrice : o.price}" data-img="${o.imgUrl || ''}" onchange="updateSubImageDisplay(); calculateTotalPrice();">
+      <label for="opt-${idx}">${label}</label>
+    </div>
+  `;
+}).join('')}
         <div id="option-images-display" class="sub-image-container option-images"><div class="sub-img-placeholder">選択中のオプションはありません</div></div>
 
         <hr style="border-color:#333; margin:20px 0;">
@@ -1039,45 +1103,279 @@ async function openCarDetail(carId) {
     }
 
     // --- マイページ・店舗管理 ---
-    async function loadMypageData() {
-      if (!window.currentUser) return;
-      const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-      const statusArea = document.getElementById('maker-status-area');
+   // --- マイページ・店舗管理 ---
+// --- マイページ・店舗管理 ---
+async function loadMypageData() {
+  if (!window.currentUser) return;
+  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  const statusArea = document.getElementById('maker-status-area');
 
-      if (!maker) {
-        statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
-        return;
-      }
+  if (!maker) {
+    statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
+    return;
+  }
 
-      statusArea.innerHTML = `
-        <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
-          <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
-          <div>
-            <h3>${maker.makerName}</h3>
-            <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
-            <button class="btn btn-secondary" onclick="openMakerModal()">メーカー情報を編集</button>
-          </div>
-        </div>
-      `;
+  statusArea.innerHTML = `
+    <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
+      <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
+      <div>
+        <h3>${maker.makerName}</h3>
+        <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
+        <button class="btn btn-secondary" onclick="openMakerModal()">メーカー情報を編集</button>
+      </div>
+    </div>
+  `;
 
-      const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
-      const orderList = document.getElementById('orders-notification-list');
-      if (orderRes && orderRes.orders.length > 0) {
-        orderList.innerHTML = orderRes.orders.map(o => `
-          <div class="notif-box">
-            <strong>【注文】${o.buyerName} 様</strong> - ${o.createdAt}<br>
-            グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${o.options.join(', ') || 'なし'}<br>
-            合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
-            ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
-          </div>
-        `).join('');
-      } else {
-        orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
-      }
+  // ★★★ クーポン発行フォーム ★★★
+  statusArea.insertAdjacentHTML('afterend', `
+    <hr style="border-color: #333; margin: 20px 0;">
+    <div id="coupon-management">
+      <h3>📢 クーポン発行（全ユーザー向け）</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+        <input type="text" id="coupon-code" placeholder="クーポンコード（英数字）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="text" id="coupon-desc" placeholder="説明" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <select id="coupon-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+          <option value="fixed">固定額</option>
+          <option value="percent">パーセント</option>
+        </select>
+        <input type="number" id="coupon-value" placeholder="割引額" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="date" id="coupon-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="date" id="coupon-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="number" id="coupon-min" placeholder="最小注文額（任意）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <button class="btn" onclick="publishCoupon()" style="grid-column: span 2;">クーポンを発行</button>
+      </div>
+    </div>
+  `);
 
-      const myCars = await callGasApi('getCars', { makerId: maker.makerId });
-      renderCarGrid('my-cars-grid', myCars || [], true);
-    }
+  // ★★★ 発行済みクーポン一覧 ★★★
+  statusArea.insertAdjacentHTML('afterend', `
+    <hr style="border-color: #333; margin: 20px 0;">
+    <div id="my-coupons-list">
+      <h3>📋 発行済みクーポン</h3>
+      <div id="coupons-list-container"></div>
+    </div>
+  `);
+
+  // ★★★ セール設定フォーム ★★★
+  statusArea.insertAdjacentHTML('afterend', `
+    <hr style="border-color: #333; margin: 20px 0;">
+    <div id="sale-management">
+      <h3>🔥 セール設定（自社車両対象）</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+        <select id="sale-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+          <option value="total">合計金額割引</option>
+          <option value="parts">パーツ単位割引</option>
+        </select>
+        <input type="text" id="sale-target-id" placeholder="対象ID（パーツのdetailId）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <select id="sale-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+          <option value="fixed">固定額</option>
+          <option value="percent">パーセント</option>
+        </select>
+        <input type="number" id="sale-value" placeholder="割引額" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="date" id="sale-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="date" id="sale-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <input type="text" id="sale-car-id" placeholder="対象車両ID（空の場合は全自社車両）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <button class="btn" onclick="setSale()" style="grid-column: span 2;">セールを設定</button>
+      </div>
+    </div>
+  `);
+
+  // ★★★ 設定済みセール一覧 ★★★
+  statusArea.insertAdjacentHTML('afterend', `
+    <hr style="border-color: #333; margin: 20px 0;">
+    <div id="my-sales-list">
+      <h3>📋 設定済みセール</h3>
+      <div id="sales-list-container"></div>
+    </div>
+  `);
+
+  // 注文・通知一覧
+  const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
+  const orderList = document.getElementById('orders-notification-list');
+  if (orderRes && orderRes.orders.length > 0) {
+    orderList.innerHTML = orderRes.orders.map(o => `
+      <div class="notif-box">
+        <strong>【注文】${o.buyerName} 様</strong> - ${o.createdAt}<br>
+        グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${o.options.join(', ') || 'なし'}<br>
+        合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
+        ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
+      </div>
+    `).join('');
+  } else {
+    orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
+  }
+
+  // 自社車両
+  const myCars = await callGasApi('getCars', { makerId: maker.makerId });
+  renderCarGrid('my-cars-grid', myCars || [], true);
+
+  // ★★★ 発行済みクーポン一覧を読み込み ★★★
+  loadMyCoupons();
+  // ★★★ 設定済みセール一覧を読み込み ★★★
+  loadMySales(maker.makerId);
+}
+
+// ★★★ クーポン発行関数 ★★★
+async function publishCoupon() {
+  const code = document.getElementById('coupon-code').value.trim();
+  if (!code) return alert("クーポンコードを入力してください");
+  const payload = {
+    code: code,
+    description: document.getElementById('coupon-desc').value,
+    discountType: document.getElementById('coupon-type').value,
+    discountValue: Number(document.getElementById('coupon-value').value),
+    minOrderAmount: Number(document.getElementById('coupon-min').value) || 0,
+    startDate: document.getElementById('coupon-start').value,
+    endDate: document.getElementById('coupon-end').value,
+    targetType: 'all',
+    issuedBy: window.currentUser.uid
+  };
+  const res = await callGasApi('saveCoupon', payload);
+  if (res) {
+    alert(res.message);
+    // 再読み込み
+    loadMyCoupons();
+  }
+}
+
+// ★★★ 発行済みクーポン一覧を表示 ★★★
+async function loadMyCoupons() {
+  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  if (!maker) return;
+  const coupons = await callGasApi('getMyCoupons', { issuedBy: window.currentUser.uid });
+  const container = document.getElementById('coupons-list-container');
+  if (!container) return;
+  if (!coupons || coupons.length === 0) {
+    container.innerHTML = `<p style="color:#888;">発行したクーポンはありません。</p>`;
+    return;
+  }
+  container.innerHTML = coupons.map(c => `
+    <div class="notif-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+      <div>
+        <strong>${c.code}</strong> - ${c.description}<br>
+        ${c.discountType === 'fixed' ? c.discountValue + 'CR OFF' : c.discountValue + '% OFF'}
+        ${c.minOrderAmount > 0 ? `（最小注文額: ${c.minOrderAmount}CR）` : ''}
+        <br>有効期間: ${c.startDate} 〜 ${c.endDate}
+        <span style="color:${c.isActive ? '#4caf50' : '#f44336'};">${c.isActive ? '有効' : '無効'}</span>
+      </div>
+      <div style="display:flex; gap:5px;">
+        <button class="btn btn-secondary" style="font-size:0.8rem; padding:4px 10px;" onclick="editCoupon('${c.couponId}')">編集</button>
+        <button class="btn btn-danger" style="font-size:0.8rem; padding:4px 10px;" onclick="deleteCoupon('${c.couponId}')">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ★★★ クーポン削除 ★★★
+async function deleteCoupon(couponId) {
+  if (!confirm("このクーポンを削除しますか？")) return;
+  const res = await callGasApi('deleteCoupon', { couponId: couponId });
+  if (res) {
+    alert(res.message);
+    loadMyCoupons();
+  }
+}
+
+// ★★★ クーポン編集（簡易版） ★★★
+async function editCoupon(couponId) {
+  // 簡易的に有効/無効を切り替える（本格的な編集は後日実装）
+  const res = await callGasApi('updateCoupon', {
+    couponId: couponId,
+    code: prompt('新しいクーポンコードを入力') || '',
+    description: prompt('説明を入力') || '',
+    discountType: prompt('割引タイプ (fixed/percent)') || 'fixed',
+    discountValue: Number(prompt('割引額を入力') || 0),
+    minOrderAmount: Number(prompt('最小注文額を入力 (0=制限なし)') || 0),
+    targetType: 'all',
+    targetId: '',
+    startDate: prompt('開始日 (YYYY-MM-DD)') || '',
+    endDate: prompt('終了日 (YYYY-MM-DD)') || '',
+    isActive: confirm('有効にしますか？')
+  });
+  if (res) {
+    alert(res.message);
+    loadMyCoupons();
+  }
+}
+
+// ★★★ セール設定 ★★★
+async function setSale() {
+  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  if (!maker) return alert("メーカー登録が必要です");
+  const carId = document.getElementById('sale-car-id').value.trim();
+  const payload = {
+    carId: carId || maker.makerId,
+    targetType: document.getElementById('sale-target-type').value,
+    targetId: document.getElementById('sale-target-id').value || '',
+    discountType: document.getElementById('sale-type').value,
+    discountValue: Number(document.getElementById('sale-value').value),
+    startDate: document.getElementById('sale-start').value,
+    endDate: document.getElementById('sale-end').value
+  };
+  const res = await callGasApi('saveSale', payload);
+  if (res) {
+    alert(res.message);
+    loadMySales(maker.makerId);
+  }
+}
+
+// ★★★ 設定済みセール一覧 ★★★
+async function loadMySales(makerId) {
+  const sales = await callGasApi('getMySales', { makerId: makerId });
+  const container = document.getElementById('sales-list-container');
+  if (!container) return;
+  if (!sales || sales.length === 0) {
+    container.innerHTML = `<p style="color:#888;">設定したセールはありません。</p>`;
+    return;
+  }
+  container.innerHTML = sales.map(s => `
+    <div class="notif-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+      <div>
+        <strong>車両ID: ${s.carId}</strong><br>
+        対象: ${s.targetType === 'total' ? '合計金額' : 'パーツ単位'} 
+        ${s.targetId ? `（対象ID: ${s.targetId}）` : '（全パーツ対象）'}<br>
+        ${s.discountType === 'fixed' ? s.discountValue + 'CR OFF' : s.discountValue + '% OFF'}
+        <br>有効期間: ${s.startDate} 〜 ${s.endDate}
+        <span style="color:${s.isActive ? '#4caf50' : '#f44336'};">${s.isActive ? '有効' : '無効'}</span>
+      </div>
+      <div style="display:flex; gap:5px;">
+        <button class="btn btn-secondary" style="font-size:0.8rem; padding:4px 10px;" onclick="editSale('${s.saleId}')">編集</button>
+        <button class="btn btn-danger" style="font-size:0.8rem; padding:4px 10px;" onclick="deleteSale('${s.saleId}')">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ★★★ セール削除 ★★★
+async function deleteSale(saleId) {
+  if (!confirm("このセールを削除しますか？")) return;
+  const res = await callGasApi('deleteSale', { saleId: saleId });
+  if (res) {
+    alert(res.message);
+    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+    if (maker) loadMySales(maker.makerId);
+  }
+}
+
+// ★★★ セール編集（簡易版） ★★★
+async function editSale(saleId) {
+  const res = await callGasApi('updateSale', {
+    saleId: saleId,
+    carId: prompt('対象車両IDを入力') || '',
+    targetType: prompt('対象タイプ (total/parts)') || 'total',
+    targetId: prompt('対象ID（パーツのdetailId）') || '',
+    discountType: prompt('割引タイプ (fixed/percent)') || 'fixed',
+    discountValue: Number(prompt('割引額を入力') || 0),
+    startDate: prompt('開始日 (YYYY-MM-DD)') || '',
+    endDate: prompt('終了日 (YYYY-MM-DD)') || '',
+    isActive: confirm('有効にしますか？')
+  });
+  if (res) {
+    alert(res.message);
+    const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+    if (maker) loadMySales(maker.makerId);
+  }
+}
 
     async function confirmDelivery(orderId) {
       if (!confirm("納車を完了にしますか？")) return;
