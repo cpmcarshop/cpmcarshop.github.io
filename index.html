@@ -1035,16 +1035,15 @@ async function openCarDetail(carId) {
 
         <h4>1. グレード選択</h4>
         <select id="buy-grade" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
-  ${car.grades.map(g => {
-    // ★追加: セール価格があれば表示を変更
-    let priceDisplay = Number(g.price).toLocaleString() + ' CR';
-    let label = `${g.gradeName} (+${priceDisplay})`;
-    if (g.salePrice !== undefined && g.salePrice !== null) {
-      const saleDisplay = Number(g.salePrice).toLocaleString() + ' CR';
-      label = `${g.gradeName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
-    }
-    return `<option value="${g.gradeName}" data-price="${g.salePrice !== undefined && g.salePrice !== null ? g.salePrice : g.price}" data-img="${g.imgUrl || ''}">${label}</option>`;
-  }).join('')}
+ ${car.grades.map(g => {
+  let priceDisplay = Number(g.price).toLocaleString() + ' CR';
+  let label = `${g.gradeName} (+${priceDisplay})`;
+  if (g.salePrice !== undefined && g.salePrice !== null) {
+    const saleDisplay = Number(g.salePrice).toLocaleString() + ' CR';
+    label = `${g.gradeName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
+  }
+  return `<option value="${g.gradeName}" data-price="${g.salePrice !== undefined && g.salePrice !== null ? g.salePrice : g.price}" data-img="${g.imgUrl || ''}">${label}</option>`;
+}).join('')}
 </select>
         <div id="grade-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
@@ -1158,34 +1157,35 @@ async function openCarDetail(carId) {
     }
 
     function calculateTotalPriceWithCoupon() {
-      if (!currentCarDetail) return;
-      let total = 0;
-      const gradeEl = document.getElementById('buy-grade');
-      if (gradeEl && gradeEl.selectedOptions[0]) {
-        total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
-      }
-      const colorEl = document.getElementById('buy-color');
-      if (colorEl && colorEl.selectedOptions[0]) {
-        total += Number(colorEl.selectedOptions[0].dataset.price || 0);
-      }
-      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
-        total += Number(cb.dataset.price || 0);
-      });
-      
-      if (appliedCouponDetail) {
-        let discounted = total;
-        if (appliedCouponDetail.discountType === 'fixed') {
-          discounted = Math.max(0, total - appliedCouponDetail.discountValue);
-        } else {
-          discounted = Math.floor(total * (1 - appliedCouponDetail.discountValue / 100));
-        }
-        document.getElementById('buy-total-price').innerText = discounted.toLocaleString();
-        document.getElementById('coupon-discount-info').innerHTML = `🪙 クーポン割引: -${(total - discounted).toLocaleString()} CR`;
-      } else {
-        document.getElementById('buy-total-price').innerText = total.toLocaleString();
-        document.getElementById('coupon-discount-info').innerHTML = '';
-      }
+  if (!currentCarDetail) return;
+  let total = 0;
+  const gradeEl = document.getElementById('buy-grade');
+  if (gradeEl && gradeEl.selectedOptions[0]) {
+    total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
+  }
+  const colorEl = document.getElementById('buy-color');
+  if (colorEl && colorEl.selectedOptions[0]) {
+    total += Number(colorEl.selectedOptions[0].dataset.price || 0);
+  }
+  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
+    total += Number(cb.dataset.price || 0);
+  });
+
+  if (appliedCouponDetail) {
+    let discounted = total;
+    if (appliedCouponDetail.discountType === 'fixed') {
+      const discount = Math.min(appliedCouponDetail.discountValue, total);
+      discounted = Math.max(0, total - discount);
+    } else {
+      discounted = Math.floor(total * (1 - appliedCouponDetail.discountValue / 100));
     }
+    document.getElementById('buy-total-price').innerText = discounted.toLocaleString();
+    document.getElementById('coupon-discount-info').innerHTML = `🪙 クーポン割引: -${(total - discounted).toLocaleString()} CR`;
+  } else {
+    document.getElementById('buy-total-price').innerText = total.toLocaleString();
+    document.getElementById('coupon-discount-info').innerHTML = '';
+  }
+}
 
     // 購入実行（クーポン適用対応）
     async function executePurchase() {
