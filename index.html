@@ -1107,46 +1107,67 @@ async function openCarDetail(carId) {
       document.getElementById('detail-modal').style.display = 'flex';
     }
 
-    function calculateTotalPrice() {
-      if (!currentCarDetail) return;
-      let total = 0;
+   function calculateTotalPrice() {
+  if (!currentCarDetail) return;
+  let total = 0;
 
-      const gradeEl = document.getElementById('buy-grade');
-      if (gradeEl && gradeEl.selectedOptions[0]) total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
+  const gradeEl = document.getElementById('buy-grade');
+  if (gradeEl && gradeEl.selectedOptions[0]) {
+    const gradeName = gradeEl.value;
+    const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
+    total += (grade && grade.salePrice !== undefined && grade.salePrice !== null) ? grade.salePrice : Number(gradeEl.selectedOptions[0].dataset.price || 0);
+  }
 
-      const colorEl = document.getElementById('buy-color');
-      if (colorEl && colorEl.selectedOptions[0]) total += Number(colorEl.selectedOptions[0].dataset.price || 0);
+  const colorEl = document.getElementById('buy-color');
+  if (colorEl && colorEl.selectedOptions[0]) {
+    const colorName = colorEl.value;
+    const color = currentCarDetail.colors.find(c => c.colorName === colorName);
+    total += (color && color.salePrice !== undefined && color.salePrice !== null) ? color.salePrice : Number(colorEl.selectedOptions[0].dataset.price || 0);
+  }
 
-      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
-        total += Number(cb.dataset.price || 0);
-      });
+  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
+    const optName = cb.dataset.name;
+    const opt = currentCarDetail.options.find(o => o.optionName === optName);
+    total += (opt && opt.salePrice !== undefined && opt.salePrice !== null) ? opt.salePrice : Number(cb.dataset.price || 0);
+  });
 
-      document.getElementById('buy-total-price').innerText = total.toLocaleString();
-    }
+  // クーポン適用があればその後の処理で割引
+ if (!appliedCouponDetail) {
+    document.getElementById('buy-total-price').innerText = total.toLocaleString();
+    document.getElementById('coupon-discount-info').innerHTML = '';
+  } else {
+    // クーポン適用中は calculateTotalPriceWithCoupon が表示を管理するので、ここでは何もしない
+    // または、クーポン適用中の場合は calculateTotalPriceWithCoupon を呼び出す
+    calculateTotalPriceWithCoupon();
+  }
+}
 
     // ★★★ 追加: クーポン適用（詳細画面） ★★★
     let appliedCouponDetail = null;
 
     async function applyCouponToDetail() {
-      const code = document.getElementById('coupon-input').value.trim();
-      if (!code) return alert("クーポンコードを入力してください");
-      const totalDisplay = document.getElementById('buy-total-price');
-      let total = Number(totalDisplay.innerText.replace(/,/g, ''));
-      if (isNaN(total)) total = 0;
-      
-      const result = await callGasApi('validateCoupon', {
-        code: code,
-        carId: currentCarDetail.carId,
-        totalAmount: total
-      });
-      if (result) {
-        appliedCouponDetail = result;
-        document.getElementById('coupon-status').innerHTML = `✅ クーポン「${result.description}」適用中 (${result.discountType === 'fixed' ? result.discountValue + 'CR OFF' : result.discountValue + '% OFF'})`;
-        calculateTotalPriceWithCoupon();
-      } else {
-        alert("無効なクーポンコードです");
-      }
-    }
+  const code = document.getElementById('coupon-input').value.trim();
+  if (!code) return alert("クーポンコードを入力してください");
+  // ★ 現在のセール反映済み合計を取得（calculateTotalPrice は表示も更新するが、数値は再度計算する）
+  // ここでは calculateTotalPrice を呼んで合計を再計算し、その値を元にクーポン検証
+  calculateTotalPrice(); // 合計表示を最新に更新
+  const totalDisplay = document.getElementById('buy-total-price');
+  let total = Number(totalDisplay.innerText.replace(/,/g, ''));
+  if (isNaN(total)) total = 0;
+
+  const result = await callGasApi('validateCoupon', {
+    code: code,
+    carId: currentCarDetail.carId,
+    totalAmount: total
+  });
+  if (result) {
+    appliedCouponDetail = result;
+    document.getElementById('coupon-status').innerHTML = `✅ クーポン「${result.description}」適用中 (${result.discountType === 'fixed' ? result.discountValue + 'CR OFF' : result.discountValue + '% OFF'})`;
+    calculateTotalPriceWithCoupon(); // ★ セール価格を反映した上でクーポン適用
+  } else {
+    alert("無効なクーポンコードです");
+  }
+}
 
     function removeCouponFromDetail() {
       appliedCouponDetail = null;
@@ -1156,21 +1177,38 @@ async function openCarDetail(carId) {
       calculateTotalPrice();
     }
 
-    function calculateTotalPriceWithCoupon() {
+function calculateTotalPriceWithCoupon() {
   if (!currentCarDetail) return;
   let total = 0;
+
+  // ★ セール価格を優先する（calculateTotalPrice と同じロジック）
   const gradeEl = document.getElementById('buy-grade');
   if (gradeEl && gradeEl.selectedOptions[0]) {
-    total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
+    const gradeName = gradeEl.value;
+    const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
+    total += (grade && grade.salePrice !== undefined && grade.salePrice !== null) 
+             ? grade.salePrice 
+             : Number(gradeEl.selectedOptions[0].dataset.price || 0);
   }
+
   const colorEl = document.getElementById('buy-color');
   if (colorEl && colorEl.selectedOptions[0]) {
-    total += Number(colorEl.selectedOptions[0].dataset.price || 0);
+    const colorName = colorEl.value;
+    const color = currentCarDetail.colors.find(c => c.colorName === colorName);
+    total += (color && color.salePrice !== undefined && color.salePrice !== null) 
+             ? color.salePrice 
+             : Number(colorEl.selectedOptions[0].dataset.price || 0);
   }
+
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
-    total += Number(cb.dataset.price || 0);
+    const optName = cb.dataset.name;
+    const opt = currentCarDetail.options.find(o => o.optionName === optName);
+    total += (opt && opt.salePrice !== undefined && opt.salePrice !== null) 
+             ? opt.salePrice 
+             : Number(cb.dataset.price || 0);
   });
 
+  // ★ クーポン割引を適用
   if (appliedCouponDetail) {
     let discounted = total;
     if (appliedCouponDetail.discountType === 'fixed') {
