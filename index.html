@@ -1106,6 +1106,7 @@ async function openCarDetail(carId) {
    // --- マイページ・店舗管理 ---
 // --- マイページ・店舗管理 ---
 // --- マイページ・店舗管理 ---
+// --- マイページ・店舗管理 ---
 async function loadMypageData() {
   if (!window.currentUser) return;
   const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
@@ -1113,13 +1114,14 @@ async function loadMypageData() {
 
   if (!maker) {
     statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
-    // 管理セクションをクリア（既存のものが残らないように）
     const existingAdmin = document.getElementById('admin-sections');
     if (existingAdmin) existingAdmin.remove();
     return;
   }
 
-  // ★ メーカー情報表示
+  // ★ 自社車両一覧を先に取得（セレクトボックス用）
+  const myCars = await callGasApi('getCars', { makerId: maker.makerId });
+
   statusArea.innerHTML = `
     <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
       <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
@@ -1131,16 +1133,23 @@ async function loadMypageData() {
     </div>
   `;
 
-  // ★★★ 管理セクションを1つのコンテナにまとめる ★★★
-  // 既存の管理セクションがあれば削除してから新しく作成
+  // ★ 管理セクションを1つのコンテナにまとめる
   const existingAdmin = document.getElementById('admin-sections');
   if (existingAdmin) existingAdmin.remove();
 
   const adminContainer = document.createElement('div');
   adminContainer.id = 'admin-sections';
 
+  // 車両セレクトボックス用のオプションを生成
+  let carOptions = '<option value="">-- 車両を選択 --</option>';
+  if (myCars && myCars.length > 0) {
+    myCars.forEach(c => {
+      carOptions += `<option value="${c.carId}">${c.carName}</option>`;
+    });
+  }
+
   adminContainer.innerHTML = `
-    <!-- クーポン発行フォーム -->
+    <!-- クーポン発行 -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="coupon-management">
       <h3>📢 クーポン発行（全ユーザー向け）</h3>
@@ -1166,24 +1175,32 @@ async function loadMypageData() {
       <div id="coupons-list-container"></div>
     </div>
 
-    <!-- セール設定フォーム -->
+    <!-- セール設定 -->
     <hr style="border-color: #333; margin: 20px 0;">
     <div id="sale-management">
       <h3>🔥 セール設定（自社車両対象）</h3>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
-        <select id="sale-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <select id="sale-car-select" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+          ${carOptions}
+        </select>
+        <select id="sale-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;" onchange="toggleSalePartSelect()">
           <option value="total">合計金額割引</option>
           <option value="parts">パーツ単位割引</option>
         </select>
-        <input type="text" id="sale-target-id" placeholder="対象ID（パーツのdetailId）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <div id="sale-part-select-container" style="display:none; grid-column: span 2;">
+          <select id="sale-part-select" style="width:100%; padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+            <option value="">-- パーツを選択 --</option>
+          </select>
+        </div>
         <select id="sale-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
           <option value="fixed">固定額</option>
           <option value="percent">パーセント</option>
         </select>
         <input type="number" id="sale-value" placeholder="割引額" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <label style="color:#aaa; font-size:0.8rem; align-self:center;">開始日</label>
         <input type="date" id="sale-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <label style="color:#aaa; font-size:0.8rem; align-self:center;">終了日</label>
         <input type="date" id="sale-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
-        <input type="text" id="sale-car-id" placeholder="対象車両ID（空の場合は全自社車両）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <button class="btn" onclick="setSale()" style="grid-column: span 2;">セールを設定</button>
       </div>
     </div>
@@ -1196,10 +1213,21 @@ async function loadMypageData() {
     </div>
   `;
 
-  // ★ statusArea の直後に管理コンテナを挿入
   statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
 
-  // ★★★ 注文・通知一覧（既存のDOMをそのまま使用） ★★★
+  // ★ 車両選択時にパーツリストを更新するイベント
+  document.getElementById('sale-car-select').addEventListener('change', function() {
+    updateSalePartsList(this.value);
+  });
+
+  // ★ パーツ単位選択時に表示を切り替え
+  window.toggleSalePartSelect = function() {
+    const container = document.getElementById('sale-part-select-container');
+    const targetType = document.getElementById('sale-target-type').value;
+    container.style.display = (targetType === 'parts') ? 'block' : 'none';
+  };
+
+  // 注文・通知一覧（既存）
   const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
   const orderList = document.getElementById('orders-notification-list');
   if (orderRes && orderRes.orders.length > 0) {
@@ -1215,14 +1243,43 @@ async function loadMypageData() {
     orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
   }
 
-  // ★★★ 自社車両 ★★★
-  const myCars = await callGasApi('getCars', { makerId: maker.makerId });
+  // 自社車両（既存）
   renderCarGrid('my-cars-grid', myCars || [], true);
 
-  // ★★★ 発行済みクーポン一覧を読み込み ★★★
+  // クーポン・セール一覧読み込み
   loadMyCoupons();
-  // ★★★ 設定済みセール一覧を読み込み ★★★
   loadMySales(maker.makerId);
+}
+
+// ★ 車両選択時にパーツリストを更新する関数
+async function updateSalePartsList(carId) {
+  const partSelect = document.getElementById('sale-part-select');
+  if (!carId) {
+    partSelect.innerHTML = '<option value="">-- 車両を先に選択 --</option>';
+    return;
+  }
+  const car = await callGasApi('getCarDetail', { carId: carId });
+  if (!car) return;
+  let options = '<option value="">-- パーツを選択 --</option>';
+  // グレード
+  if (car.grades && car.grades.length) {
+    car.grades.forEach(g => {
+      options += `<option value="${g.gradeId}">グレード: ${g.gradeName}</option>`;
+    });
+  }
+  // カラー
+  if (car.colors && car.colors.length) {
+    car.colors.forEach(c => {
+      options += `<option value="${c.colorId}">カラー: ${c.colorName}</option>`;
+    });
+  }
+  // オプション
+  if (car.options && car.options.length) {
+    car.options.forEach(o => {
+      options += `<option value="${o.optionId}">オプション: ${o.optionName}</option>`;
+    });
+  }
+  partSelect.innerHTML = options;
 }
 
 // ★★★ クーポン発行関数 ★★★
@@ -1309,26 +1366,41 @@ async function editCoupon(couponId) {
 }
 
 // ★★★ セール設定 ★★★
+// ★★★ セール設定 ★★★
 async function setSale() {
   const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
   if (!maker) return alert("メーカー登録が必要です");
-  const carId = document.getElementById('sale-car-id').value.trim();
+
+  const carId = document.getElementById('sale-car-select').value;
+  if (!carId) return alert("対象車両を選択してください");
+
+  const targetType = document.getElementById('sale-target-type').value;
+  let targetId = '';
+  if (targetType === 'parts') {
+    targetId = document.getElementById('sale-part-select').value;
+    if (!targetId) return alert("パーツを選択してください");
+  }
+
   const payload = {
-    carId: carId || maker.makerId,
-    targetType: document.getElementById('sale-target-type').value,
-    targetId: document.getElementById('sale-target-id').value || '',
+    carId: carId,
+    targetType: targetType,
+    targetId: targetId,
     discountType: document.getElementById('sale-type').value,
     discountValue: Number(document.getElementById('sale-value').value),
     startDate: document.getElementById('sale-start').value,
     endDate: document.getElementById('sale-end').value
   };
+
+  // 日付チェック
+  if (!payload.startDate || !payload.endDate) return alert("開始日と終了日を入力してください");
+  if (payload.startDate > payload.endDate) return alert("開始日が終了日より後になっています");
+
   const res = await callGasApi('saveSale', payload);
   if (res) {
     alert(res.message);
     loadMySales(maker.makerId);
   }
 }
-
 // ★★★ 設定済みセール一覧 ★★★
 async function loadMySales(makerId) {
   const sales = await callGasApi('getMySales', { makerId: makerId });
@@ -1341,10 +1413,9 @@ async function loadMySales(makerId) {
   container.innerHTML = sales.map(s => `
     <div class="notif-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
       <div>
-        <strong>車両ID: ${s.carId}</strong><br>
-        対象: ${s.targetType === 'total' ? '合計金額' : 'パーツ単位'} 
-        ${s.targetId ? `（対象ID: ${s.targetId}）` : '（全パーツ対象）'}<br>
-        ${s.discountType === 'fixed' ? s.discountValue + 'CR OFF' : s.discountValue + '% OFF'}
+        <strong>車両: ${s.carName}</strong>
+        ${s.targetType === 'parts' ? `<br>対象パーツ: ${s.partName || s.targetId}` : ''}
+        <br>割引: ${s.discountType === 'fixed' ? s.discountValue + 'CR OFF' : s.discountValue + '% OFF'}
         <br>有効期間: ${s.startDate} 〜 ${s.endDate}
         <span style="color:${s.isActive ? '#4caf50' : '#f44336'};">${s.isActive ? '有効' : '無効'}</span>
       </div>
