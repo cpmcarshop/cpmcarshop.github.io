@@ -394,6 +394,57 @@
     </div>
   </div>
 
+  <!-- ★★★ 追加: クーポン編集モーダル ★★★ -->
+  <div id="edit-coupon-modal" class="modal">
+    <div class="modal-content">
+      <h3 id="edit-coupon-title">クーポン編集</h3>
+      <input type="hidden" id="edit-coupon-id">
+      <div class="form-group"><label>クーポンコード</label><input type="text" id="edit-coupon-code"></div>
+      <div class="form-group"><label>説明</label><input type="text" id="edit-coupon-desc"></div>
+      <div class="form-group">
+        <label>割引タイプ</label>
+        <select id="edit-coupon-type"><option value="fixed">固定額</option><option value="percent">パーセント</option></select>
+      </div>
+      <div class="form-group"><label>割引額</label><input type="number" id="edit-coupon-value"></div>
+      <div class="form-group"><label>最小注文額</label><input type="number" id="edit-coupon-min" value="0"></div>
+      <div class="form-group"><label>開始日</label><input type="date" id="edit-coupon-start"></div>
+      <div class="form-group"><label>終了日</label><input type="date" id="edit-coupon-end"></div>
+      <div class="form-group">
+        <label>有効</label>
+        <select id="edit-coupon-active"><option value="true">有効</option><option value="false">無効</option></select>
+      </div>
+      <button class="btn" onclick="saveEditCoupon()">保存</button>
+      <button class="btn btn-secondary" onclick="closeModal('edit-coupon-modal')">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ★★★ 追加: セール編集モーダル ★★★ -->
+  <div id="edit-sale-modal" class="modal">
+    <div class="modal-content">
+      <h3 id="edit-sale-title">セール編集</h3>
+      <input type="hidden" id="edit-sale-id">
+      <div class="form-group"><label>対象車両ID</label><input type="text" id="edit-sale-car-id"></div>
+      <div class="form-group">
+        <label>対象タイプ</label>
+        <select id="edit-sale-target-type"><option value="total">合計金額</option><option value="parts">パーツ単位</option></select>
+      </div>
+      <div class="form-group"><label>対象ID（パーツのdetailId）</label><input type="text" id="edit-sale-target-id"></div>
+      <div class="form-group">
+        <label>割引タイプ</label>
+        <select id="edit-sale-type"><option value="fixed">固定額</option><option value="percent">パーセント</option></select>
+      </div>
+      <div class="form-group"><label>割引額</label><input type="number" id="edit-sale-value"></div>
+      <div class="form-group"><label>開始日</label><input type="date" id="edit-sale-start"></div>
+      <div class="form-group"><label>終了日</label><input type="date" id="edit-sale-end"></div>
+      <div class="form-group">
+        <label>有効</label>
+        <select id="edit-sale-active"><option value="true">有効</option><option value="false">無効</option></select>
+      </div>
+      <button class="btn" onclick="saveEditSale()">保存</button>
+      <button class="btn btn-secondary" onclick="closeModal('edit-sale-modal')">キャンセル</button>
+    </div>
+  </div>
+
   <!-- Firebase モジュール SDK (v10) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -1017,6 +1068,16 @@ async function openCarDetail(carId) {
         <div id="option-images-display" class="sub-image-container option-images"><div class="sub-img-placeholder">選択中のオプションはありません</div></div>
 
         <hr style="border-color:#333; margin:20px 0;">
+
+        <!-- ★★★ 追加: クーポン入力欄 ★★★ -->
+        <div style="margin:15px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="text" id="coupon-input" placeholder="クーポンコードを入力" style="flex:2; padding:8px; background:#0a0c1b; color:#fff; border:1px solid #333; border-radius:4px; min-width:150px;">
+          <button class="btn" onclick="applyCouponToDetail()" style="padding:8px 16px;">クーポン適用</button>
+          <button class="btn btn-secondary" onclick="removeCouponFromDetail()" style="padding:8px 16px;">解除</button>
+        </div>
+        <div id="coupon-status" style="font-size:0.9rem; color:#ffd93d; margin-bottom:10px;"></div>
+        <div id="coupon-discount-info" style="font-size:0.9rem; color:#ff6b6b; margin-bottom:10px;"></div>
+
         <h3 style="color:var(--main-color);">合計見積金額: <span id="buy-total-price">0</span> CR</h3>
 
         <button class="btn" style="width:100%; padding:12px;" onclick="executePurchase()">購入・注文を送信</button>
@@ -1052,7 +1113,69 @@ async function openCarDetail(carId) {
       document.getElementById('buy-total-price').innerText = total.toLocaleString();
     }
 
-    // 購入実行
+    // ★★★ 追加: クーポン適用（詳細画面） ★★★
+    let appliedCouponDetail = null;
+
+    async function applyCouponToDetail() {
+      const code = document.getElementById('coupon-input').value.trim();
+      if (!code) return alert("クーポンコードを入力してください");
+      const totalDisplay = document.getElementById('buy-total-price');
+      let total = Number(totalDisplay.innerText.replace(/,/g, ''));
+      if (isNaN(total)) total = 0;
+      
+      const result = await callGasApi('validateCoupon', {
+        code: code,
+        carId: currentCarDetail.carId,
+        totalAmount: total
+      });
+      if (result) {
+        appliedCouponDetail = result;
+        document.getElementById('coupon-status').innerHTML = `✅ クーポン「${result.description}」適用中 (${result.discountType === 'fixed' ? result.discountValue + 'CR OFF' : result.discountValue + '% OFF'})`;
+        calculateTotalPriceWithCoupon();
+      } else {
+        alert("無効なクーポンコードです");
+      }
+    }
+
+    function removeCouponFromDetail() {
+      appliedCouponDetail = null;
+      document.getElementById('coupon-status').innerHTML = '';
+      document.getElementById('coupon-input').value = '';
+      document.getElementById('coupon-discount-info').innerHTML = '';
+      calculateTotalPrice();
+    }
+
+    function calculateTotalPriceWithCoupon() {
+      if (!currentCarDetail) return;
+      let total = 0;
+      const gradeEl = document.getElementById('buy-grade');
+      if (gradeEl && gradeEl.selectedOptions[0]) {
+        total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
+      }
+      const colorEl = document.getElementById('buy-color');
+      if (colorEl && colorEl.selectedOptions[0]) {
+        total += Number(colorEl.selectedOptions[0].dataset.price || 0);
+      }
+      document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
+        total += Number(cb.dataset.price || 0);
+      });
+      
+      if (appliedCouponDetail) {
+        let discounted = total;
+        if (appliedCouponDetail.discountType === 'fixed') {
+          discounted = Math.max(0, total - appliedCouponDetail.discountValue);
+        } else {
+          discounted = Math.floor(total * (1 - appliedCouponDetail.discountValue / 100));
+        }
+        document.getElementById('buy-total-price').innerText = discounted.toLocaleString();
+        document.getElementById('coupon-discount-info').innerHTML = `🪙 クーポン割引: -${(total - discounted).toLocaleString()} CR`;
+      } else {
+        document.getElementById('buy-total-price').innerText = total.toLocaleString();
+        document.getElementById('coupon-discount-info').innerHTML = '';
+      }
+    }
+
+    // 購入実行（クーポン適用対応）
     async function executePurchase() {
       if (!window.currentUser) return alert("購入にはログインが必要です");
       const grade = document.getElementById('buy-grade').value;
@@ -1060,6 +1183,12 @@ async function openCarDetail(carId) {
       const options = [];
       document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
       const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
+
+      // ★ クーポン情報を取得
+      let appliedCouponCode = null;
+      if (appliedCouponDetail) {
+        appliedCouponCode = appliedCouponDetail.code;
+      }
 
       // Twitter DM 連携（contactTypeがtwitterの場合）
       if (currentCarDetail.contactType === 'twitter') {
@@ -1079,12 +1208,13 @@ async function openCarDetail(carId) {
         }
       }
 
-      // ポータル内注文作成
+      // ★ ポータル内注文作成（クーポンコードを送信）
       const res = await callGasApi('createOrder', {
         carId: currentCarDetail.carId, makerId: currentCarDetail.makerId,
         makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
         buyerUid: window.currentUser.uid, buyerName: window.currentUser.displayName || window.currentUser.email,
-        gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName
+        gradeName: grade, colorName: color, options: options, totalPrice: totalPrice, carName: currentCarDetail.carName,
+        appliedCouponCode: appliedCouponCode
       });
 
       if (res) {
@@ -1164,6 +1294,12 @@ async function loadMypageData() {
         <input type="date" id="coupon-start" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <input type="date" id="coupon-end" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <input type="number" id="coupon-min" placeholder="最小注文額（任意）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+        <!-- ★★★ 追加: クーポン対象選択 ★★★ -->
+        <select id="coupon-target-type" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+          <option value="all">すべての車両</option>
+          <option value="maker">自社車両のみ</option>
+        </select>
+        <input type="text" id="coupon-target-id" placeholder="対象ID（任意）" style="padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
         <button class="btn" onclick="publishCoupon()" style="grid-column: span 2;">クーポンを発行</button>
       </div>
     </div>
@@ -1294,7 +1430,8 @@ async function publishCoupon() {
     minOrderAmount: Number(document.getElementById('coupon-min').value) || 0,
     startDate: document.getElementById('coupon-start').value,
     endDate: document.getElementById('coupon-end').value,
-    targetType: 'all',
+    targetType: document.getElementById('coupon-target-type').value, // ★ 修正: 対象タイプを取得
+    targetId: document.getElementById('coupon-target-id').value || '', // ★ 追加: 対象IDを取得
     issuedBy: window.currentUser.uid
   };
   const res = await callGasApi('saveCoupon', payload);
@@ -1343,24 +1480,46 @@ async function deleteCoupon(couponId) {
   }
 }
 
-// ★★★ クーポン編集（簡易版） ★★★
-async function editCoupon(couponId) {
-  // 簡易的に有効/無効を切り替える（本格的な編集は後日実装）
-  const res = await callGasApi('updateCoupon', {
-    couponId: couponId,
-    code: prompt('新しいクーポンコードを入力') || '',
-    description: prompt('説明を入力') || '',
-    discountType: prompt('割引タイプ (fixed/percent)') || 'fixed',
-    discountValue: Number(prompt('割引額を入力') || 0),
-    minOrderAmount: Number(prompt('最小注文額を入力 (0=制限なし)') || 0),
+// ★★★ クーポン編集（モーダル版） ★★★
+function editCoupon(couponId) {
+  // 現在のデータを取得してモーダルにセット
+  const maker = window.currentUser ? window.currentUser.uid : '';
+  callGasApi('getMyCoupons', { issuedBy: maker }).then(coupons => {
+    const coupon = coupons.find(c => c.couponId === couponId);
+    if (!coupon) return alert("クーポンが見つかりません");
+    document.getElementById('edit-coupon-id').value = coupon.couponId;
+    document.getElementById('edit-coupon-code').value = coupon.code || '';
+    document.getElementById('edit-coupon-desc').value = coupon.description || '';
+    document.getElementById('edit-coupon-type').value = coupon.discountType || 'fixed';
+    document.getElementById('edit-coupon-value').value = coupon.discountValue || 0;
+    document.getElementById('edit-coupon-min').value = coupon.minOrderAmount || 0;
+    document.getElementById('edit-coupon-start').value = coupon.startDate || '';
+    document.getElementById('edit-coupon-end').value = coupon.endDate || '';
+    document.getElementById('edit-coupon-active').value = coupon.isActive ? 'true' : 'false';
+    document.getElementById('edit-coupon-modal').style.display = 'flex';
+  });
+}
+
+// ★★★ クーポン保存（モーダル版） ★★★
+async function saveEditCoupon() {
+  const payload = {
+    couponId: document.getElementById('edit-coupon-id').value,
+    code: document.getElementById('edit-coupon-code').value.trim(),
+    description: document.getElementById('edit-coupon-desc').value,
+    discountType: document.getElementById('edit-coupon-type').value,
+    discountValue: Number(document.getElementById('edit-coupon-value').value),
+    minOrderAmount: Number(document.getElementById('edit-coupon-min').value) || 0,
     targetType: 'all',
     targetId: '',
-    startDate: prompt('開始日 (YYYY-MM-DD)') || '',
-    endDate: prompt('終了日 (YYYY-MM-DD)') || '',
-    isActive: confirm('有効にしますか？')
-  });
+    startDate: document.getElementById('edit-coupon-start').value,
+    endDate: document.getElementById('edit-coupon-end').value,
+    isActive: document.getElementById('edit-coupon-active').value === 'true'
+  };
+  if (!payload.code) return alert("クーポンコードを入力してください");
+  const res = await callGasApi('updateCoupon', payload);
   if (res) {
     alert(res.message);
+    closeModal('edit-coupon-modal');
     loadMyCoupons();
   }
 }
@@ -1438,21 +1597,46 @@ async function deleteSale(saleId) {
   }
 }
 
-// ★★★ セール編集（簡易版） ★★★
-async function editSale(saleId) {
-  const res = await callGasApi('updateSale', {
-    saleId: saleId,
-    carId: prompt('対象車両IDを入力') || '',
-    targetType: prompt('対象タイプ (total/parts)') || 'total',
-    targetId: prompt('対象ID（パーツのdetailId）') || '',
-    discountType: prompt('割引タイプ (fixed/percent)') || 'fixed',
-    discountValue: Number(prompt('割引額を入力') || 0),
-    startDate: prompt('開始日 (YYYY-MM-DD)') || '',
-    endDate: prompt('終了日 (YYYY-MM-DD)') || '',
-    isActive: confirm('有効にしますか？')
+// ★★★ セール編集（モーダル版） ★★★
+function editSale(saleId) {
+  const maker = window.currentUser ? window.currentUser.uid : '';
+  callGasApi('getMakerByUid', { uid: maker }).then(makerData => {
+    if (!makerData) return alert("メーカー情報がありません");
+    callGasApi('getMySales', { makerId: makerData.makerId }).then(sales => {
+      const sale = sales.find(s => s.saleId === saleId);
+      if (!sale) return alert("セールが見つかりません");
+      document.getElementById('edit-sale-id').value = sale.saleId;
+      document.getElementById('edit-sale-car-id').value = sale.carId || '';
+      document.getElementById('edit-sale-target-type').value = sale.targetType || 'total';
+      document.getElementById('edit-sale-target-id').value = sale.targetId || '';
+      document.getElementById('edit-sale-type').value = sale.discountType || 'fixed';
+      document.getElementById('edit-sale-value').value = sale.discountValue || 0;
+      document.getElementById('edit-sale-start').value = sale.startDate || '';
+      document.getElementById('edit-sale-end').value = sale.endDate || '';
+      document.getElementById('edit-sale-active').value = sale.isActive ? 'true' : 'false';
+      document.getElementById('edit-sale-modal').style.display = 'flex';
+    });
   });
+}
+
+// ★★★ セール保存（モーダル版） ★★★
+async function saveEditSale() {
+  const payload = {
+    saleId: document.getElementById('edit-sale-id').value,
+    carId: document.getElementById('edit-sale-car-id').value.trim(),
+    targetType: document.getElementById('edit-sale-target-type').value,
+    targetId: document.getElementById('edit-sale-target-id').value.trim(),
+    discountType: document.getElementById('edit-sale-type').value,
+    discountValue: Number(document.getElementById('edit-sale-value').value),
+    startDate: document.getElementById('edit-sale-start').value,
+    endDate: document.getElementById('edit-sale-end').value,
+    isActive: document.getElementById('edit-sale-active').value === 'true'
+  };
+  if (!payload.carId) return alert("対象車両IDを入力してください");
+  const res = await callGasApi('updateSale', payload);
   if (res) {
     alert(res.message);
+    closeModal('edit-sale-modal');
     const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
     if (maker) loadMySales(maker.makerId);
   }
