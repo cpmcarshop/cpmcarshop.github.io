@@ -404,6 +404,7 @@
     <h3>メーカーへDMを送信</h3>
     <p>以下の内容を確認し、DMで送信してください。</p>
     <div class="form-group">
+      <div id="dm-order-info" style="color: var(--main-color); font-weight: bold; margin-bottom: 10px;"></div>
       <label>メッセージ内容（編集可能）</label>
       <textarea id="dm-message" rows="6" style="width:100%; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px; padding:8px;"></textarea>
     </div>
@@ -1305,29 +1306,10 @@ async function executePurchase() {
   }
 
   // ★ Twitter DM の場合の処理を変更
-  if (currentCarDetail.contactType === 'twitter') {
-    const twitterId = currentCarDetail.maker?.twitterId;
-    if (!twitterId) {
-      alert('メーカーのTwitter IDが未設定です。');
-      return;
-    }
-    // メッセージ作成
-    const cleanId = twitterId.replace(/^@/, '');
-    const message = 
-`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
-車種: ${currentCarDetail.carName}
-グレード: ${grade}
-カラー: ${color}
-オプション: ${options.join(', ') || 'なし'}
-合計: ${totalPrice.toLocaleString()} CR`;
-
-    // ★ DM送信モーダルを表示
-    openTwitterDmModal(message, cleanId);
-    return; // ここで終了（DMモーダルでポータル注文は別途作成するかは任意）
-  }
-
-  // ★ ポータル内注文作成（Twitter以外の場合）
-  const res = await callGasApi('createOrder', {
+ // ★ Twitter DM の場合の処理（注文を先に作成）
+if (currentCarDetail.contactType === 'twitter') {
+  // 1. ポータル側に注文を作成
+  const orderRes = await callGasApi('createOrder', {
     carId: currentCarDetail.carId,
     makerId: currentCarDetail.makerId,
     makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
@@ -1341,12 +1323,34 @@ async function executePurchase() {
     appliedCouponCode: appliedCouponCode
   });
 
-  if (res) {
-    alert(res.message);
-    closeModal('detail-modal');
+  if (!orderRes) {
+    alert('注文の作成に失敗しました。');
+    return;
   }
-}
 
+  // 2. メーカーのTwitter IDを取得
+  const twitterId = currentCarDetail.maker?.twitterId;
+  if (!twitterId) {
+    alert('メーカーのTwitter IDが未設定です。');
+    return;
+  }
+  const cleanId = twitterId.replace(/^@/, '');
+
+  // 3. DM用メッセージ（注文IDを含める）
+  const message = 
+`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
+【注文ID: ${orderRes.orderId}】
+車種: ${currentCarDetail.carName}
+グレード: ${grade}
+カラー: ${color}
+オプション: ${options.join(', ') || 'なし'}
+合計: ${totalPrice.toLocaleString()} CR`;
+
+  // 4. DMモーダルを開く（注文IDも渡す）
+  openTwitterDmModal(message, cleanId, orderRes.orderId);
+  return; // ここで終了（モーダルが開いたら処理完了）
+}
+}
     async function deleteCar(carId) {
       if (!confirm("この車両を削除してもよろしいですか？")) return;
       const res = await callGasApi('deleteCar', { carId: carId });
@@ -1466,12 +1470,21 @@ async function loadMypageData() {
   loadMyCoupons();
 }
 // DMモーダルを開く
+// DMモーダルを開く（第3引数に orderId を追加）
 let dmTargetTwitterId = '';
+let dmOrderId = '';
 
-function openTwitterDmModal(message, twitterId) {
+function openTwitterDmModal(message, twitterId, orderId = null) {
   document.getElementById('dm-message').value = message;
   dmTargetTwitterId = twitterId;
+  dmOrderId = orderId || '';
   document.getElementById('twitter-dm-modal').style.display = 'flex';
+
+  // 注文IDがあれば表示（任意）
+  const orderInfo = document.getElementById('dm-order-info');
+  if (orderInfo) {
+    orderInfo.innerText = orderId ? `注文ID: ${orderId}` : '';
+  }
 }
 
 // コピー機能
