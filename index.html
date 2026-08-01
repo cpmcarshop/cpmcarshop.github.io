@@ -1474,19 +1474,60 @@ async function loadMypageData() {
 let dmTargetTwitterId = '';
 let dmOrderId = '';
 
+// トースト通知関数（グローバル）
+function showToast(text) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #16213e; color: #fff; padding: 12px 24px;
+    border-radius: 8px; border: 1px solid var(--main-color);
+    z-index: 9999; font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  `;
+  toast.innerText = text;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// DMモーダルを開く（自動コピー + トースト通知）
+let dmTargetTwitterId = '';
+let dmOrderId = '';
+
 function openTwitterDmModal(message, twitterId, orderId = null) {
+  // メッセージをセット
   document.getElementById('dm-message').value = message;
   dmTargetTwitterId = twitterId;
   dmOrderId = orderId || '';
   document.getElementById('twitter-dm-modal').style.display = 'flex';
 
-  // 注文IDがあれば表示（任意）
+  // 注文ID表示
   const orderInfo = document.getElementById('dm-order-info');
   if (orderInfo) {
     orderInfo.innerText = orderId ? `注文ID: ${orderId}` : '';
   }
-}
 
+  // ★ 自動コピー + トースト
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(message)
+      .then(() => {
+        if (orderInfo) {
+          orderInfo.innerText += ' ✅ コピー済';
+        }
+        showToast('✅ メッセージをクリップボードに自動コピーしました');
+      })
+      .catch(() => {
+        if (orderInfo) {
+          orderInfo.innerText += ' ⚠️ コピー失敗';
+        }
+        showToast('⚠️ 自動コピーに失敗しました。コピーボタンをお使いください');
+      });
+  } else {
+    if (orderInfo) {
+      orderInfo.innerText += ' ⚠️ 非対応ブラウザ';
+    }
+    showToast('⚠️ お使いのブラウザは自動コピーに対応していません。コピーボタンをご利用ください');
+  }
+}
 // コピー機能
 function copyDmMessage() {
   const text = document.getElementById('dm-message').value;
