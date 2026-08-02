@@ -301,6 +301,61 @@
     display: block;
   }
 }
+ /* ===== アナウンス追加 ===== */
+.announcement {
+  font-size: 0.9rem;
+  color: #ffd700;
+  background: rgba(0, 210, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--main-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+#announcement-pc {
+  display: block;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+#announcement-mobile {
+  display: none;
+}
+
+/* スマホ用（768px以下） */
+@media (max-width: 768px) {
+  #announcement-pc {
+    display: none;
+  }
+
+  #announcement-mobile {
+    display: inline-block;
+    flex: 1 1 auto;
+    margin-left: 10px;
+    max-width: 150px;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+  }
+
+  /* ハンバーガーとアナウンスを横並びに */
+  .tab-menu {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tab-menu .hamburger {
+    width: auto;
+    flex: 0 0 auto;
+    border-bottom: none;
+  }
+  .tab-menu .tab-button {
+    order: 10;
+    flex-basis: 100%;
+  }
+}   
   </style>
 </head>
 <body>
@@ -319,9 +374,10 @@
 
   <header>
   <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
+  <!-- ★ 追加: PC用アナウンス -->
+  <div id="announcement-pc" class="announcement"></div>
   <div>
     <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
-    <!-- ★ お問い合わせボタン（追加） -->
     <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">お問い合わせ</button>
     <button class="btn" id="auth-btn">ログイン / 登録</button>
   </div>
@@ -329,6 +385,8 @@
 
   <nav class="tab-menu" id="tabMenu">
   <button class="hamburger" id="hamburgerBtn" aria-label="メニュー">☰</button>
+  <!-- ★ 追加: スマホ用アナウンス（ハンバーガーボタンの右隣） -->
+  <div id="announcement-mobile" class="announcement"></div>
   <button class="tab-button active" id="tab-btn-home" onclick="switchTab('home')">ホーム</button>
   <button class="tab-button" id="tab-btn-search" onclick="switchTab('search')">車両検索</button>
   <button class="tab-button" id="tab-btn-makers" onclick="switchTab('makers')">メーカー一覧</button>
@@ -1742,6 +1800,22 @@ function toggleEditCouponTarget() {
   }
 }
 
+    /**
+ * スクリプトプロパティ 'ANN' を取得して表示
+ */
+async function loadAnnouncement() {
+  const text = await callGasApi('getAnnouncement', {}, true); // ローディング表示あり
+  if (text) {
+  document.getElementById('announcement-pc').textContent = text;
+  document.getElementById('announcement-mobile').textContent = text;
+  document.getElementById('announcement-mobile').style.display = 'inline-block';  // ← 追加！
+}
+  else {
+    // 空の場合は両方非表示
+    document.getElementById('announcement-pc').style.display = 'none';
+    document.getElementById('announcement-mobile').style.display = 'none';
+  }
+}
 // ★★★ クーポン発行関数（修正） ★★★
 async function publishCoupon() {
   const code = document.getElementById('coupon-code').value.trim();
@@ -2090,7 +2164,8 @@ function addGradeForm(data = {}) {
     }
 
     // 初期表示
-    loadHomeCars();
+loadHomeCars();
+loadAnnouncement(); // ★ 追加
   </script>
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
