@@ -301,46 +301,55 @@
     display: block;
   }
 }
- /* ===== アナウンス追加 ===== */
+/* ===== アナウンス（共通） ===== */
 .announcement {
-  font-size: 0.9rem;
+  font-size: 1rem;              /* PCでは大きめ */
   color: #ffd700;
   background: rgba(0, 210, 255, 0.1);
-  padding: 4px 12px;
+  padding: 4px 14px;
   border-radius: 20px;
   border: 1px solid var(--main-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 300px;
+  white-space: normal;          /* ★ 改行を許可（省略されない） */
+  word-break: break-word;       /* ★ 長い単語も折り返す */
+  max-width: 320px;
+  cursor: pointer;              /* ★ クリックできることを示す */
+  transition: background 0.2s;
+}
+.announcement:hover {
+  background: rgba(0, 210, 255, 0.2);
 }
 
+/* PC用（ヘッダー内・h1の右） */
 #announcement-pc {
   display: block;
-  margin: 8px auto 0;
-  text-align: center;
+  margin-left: 15px;            /* h1 との間隔 */
 }
 
+/* スマホ用（ハンバーガーボタンの右） */
 #announcement-mobile {
-  display: none;
+  display: none;                /* デフォルトは非表示 */
+  margin-left: 8px;
+  font-size: 0.85rem;           /* スマホでは少し小さく */
+  padding: 2px 10px;
+  max-width: 160px;
 }
 
-/* スマホ用（768px以下） */
+/* ===== スマホ表示（768px以下） ===== */
 @media (max-width: 768px) {
+  /* PC用アナウンスを非表示、スマホ用アナウンスを表示 */
   #announcement-pc {
-    display: none;
+    display: none !important;
   }
-
   #announcement-mobile {
-    display: inline-block;
-    flex: 1 1 auto;
-    margin-left: 10px;
+    display: inline-block !important;  /* ★ ハンバーガー横に表示 */
+    flex: 0 0 auto;
+    margin-left: 8px;
     max-width: 150px;
-    font-size: 0.75rem;
-    padding: 2px 8px;
+    font-size: 0.85rem;
+    padding: 2px 10px;
   }
 
-  /* ハンバーガーとアナウンスを横並びに */
+  /* ハンバーガーメニューとアナウンスを横並びにする */
   .tab-menu {
     flex-direction: row !important;
     flex-wrap: wrap;
@@ -355,7 +364,7 @@
     order: 10;
     flex-basis: 100%;
   }
-}   
+}
   </style>
 </head>
 <body>
@@ -373,9 +382,11 @@
   </div>
 
   <header>
-  <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
-  <!-- ★ 追加: PC用アナウンス -->
-  <div id="announcement-pc" class="announcement"></div>
+  <!-- h1 と PC用アナウンスを横並びに -->
+  <div style="display: flex; align-items: center;">
+    <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
+    <div id="announcement-pc" class="announcement"></div>  <!-- ★ ここにPC用 -->
+  </div>
   <div>
     <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
     <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">お問い合わせ</button>
@@ -385,8 +396,9 @@
 
   <nav class="tab-menu" id="tabMenu">
   <button class="hamburger" id="hamburgerBtn" aria-label="メニュー">☰</button>
-  <!-- ★ 追加: スマホ用アナウンス（ハンバーガーボタンの右隣） -->
+  <!-- ★ スマホ用アナウンス（ハンバーガーボタンの右隣） -->
   <div id="announcement-mobile" class="announcement"></div>
+  
   <button class="tab-button active" id="tab-btn-home" onclick="switchTab('home')">ホーム</button>
   <button class="tab-button" id="tab-btn-search" onclick="switchTab('search')">車両検索</button>
   <button class="tab-button" id="tab-btn-makers" onclick="switchTab('makers')">メーカー一覧</button>
@@ -1803,19 +1815,36 @@ function toggleEditCouponTarget() {
     /**
  * スクリプトプロパティ 'ANN' を取得して表示
  */
+// ★★★ アナウンス読み込み（表示制御はCSSに完全に委ねる） ★★★
 async function loadAnnouncement() {
-  const text = await callGasApi('getAnnouncement', {}, true); // ローディング表示あり
+  const text = await callGasApi('getAnnouncement', {}, true);
+  const pcEl = document.getElementById('announcement-pc');
+  const mobileEl = document.getElementById('announcement-mobile');
+
   if (text) {
-  document.getElementById('announcement-pc').textContent = text;
-  document.getElementById('announcement-mobile').textContent = text;
-  document.getElementById('announcement-mobile').style.display = 'inline-block';  // ← 追加！
-}
-  else {
-    // 空の場合は両方非表示
-    document.getElementById('announcement-pc').style.display = 'none';
-    document.getElementById('announcement-mobile').style.display = 'none';
+    // テキストのみ設定（style.display は操作しない！）
+    pcEl.textContent = text;
+    mobileEl.textContent = text;
+    // 万一 style が直接書き換わっている場合に備えて初期化
+    pcEl.style.display = '';
+    mobileEl.style.display = '';
+  } else {
+    // 空の場合は両方非表示（CSSの !important を上書きしないよう display で制御）
+    pcEl.style.display = 'none';
+    mobileEl.style.display = 'none';
   }
 }
+
+// ★★★ アナウンスクリックで拡大表示（ポップアップ） ★★★
+// ページ読み込み後に全アナウンス要素にイベントを付与
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.announcement').forEach(el => {
+    el.addEventListener('click', function() {
+      const msg = this.textContent.trim() || '（現在お知らせはありません）';
+      alert('📢 お知らせ\n\n' + msg);
+    });
+  });
+});
 // ★★★ クーポン発行関数（修正） ★★★
 async function publishCoupon() {
   const code = document.getElementById('coupon-code').value.trim();
