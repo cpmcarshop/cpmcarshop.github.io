@@ -279,9 +279,9 @@
   display: none;
 }
 /* ログイン時に表示（JavaScriptでこのクラスを付与） */
-#mypage-tab.is-visible {
-  display: inline-block;  /* PCではインライン表示 */
-}
+ .tab-menu.open #mypage-tab.is-visible {
+    display: block;
+  }
 
 /* スマホ時はハンバーガーメニュー内でブロック表示 */
 @media (max-width: 768px) {
