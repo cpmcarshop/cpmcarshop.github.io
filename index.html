@@ -275,15 +275,16 @@
   }
 }
     /* デフォルトは非表示（ログイン時のみ表示） */
+/* デフォルトでは非表示（ログイン時のみ表示） */
 #mypage-tab {
   display: none;
 }
-/* ログイン時に表示（JavaScriptでこのクラスを付与） */
- .tab-menu.open #mypage-tab.is-visible {
-    display: block;
-  }
+/* ログイン時はデスクトップで表示（スマホでは上書き） */
+#mypage-tab.is-visible {
+  display: block;
+}
 
-/* スマホ時はハンバーガーメニュー内でブロック表示 */
+/* スマホ表示（768px以下） */
 @media (max-width: 768px) {
   .tab-menu .tab-button {
     display: none;
@@ -291,8 +292,12 @@
   .tab-menu.open .tab-button {
     display: block;
   }
-  /* ログイン中はハンバーガー内でも表示させる */
+
+  /* ★ スマホでは常に非表示（ハンバーガー開いたときだけ表示） */
   #mypage-tab.is-visible {
+    display: none;
+  }
+  .tab-menu.open #mypage-tab.is-visible {
     display: block;
   }
 }
