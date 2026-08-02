@@ -202,7 +202,6 @@
   font-family: inherit;
 }
     /* ===== スマホ用ハンバーガーメニュー ===== */
-/* ===== ハンバーガーメニュー（スマホ用） ===== */
 .hamburger {
   display: none;
   background: none;
@@ -211,28 +210,27 @@
   font-size: 1.8rem;
   padding: 8px 12px;
   cursor: pointer;
-  margin-left: auto;
+  margin-left: 0;          /* ★ auto から 0 に変更（左寄せ） */
 }
 
 /* スマホ表示（768px以下） */
 @media (max-width: 768px) {
+  /* ★ タブメニュー全体を左寄せに */
   .tab-menu {
-    flex-wrap: nowrap;          /* 折り返し禁止 */
-    flex-direction: column;     /* 縦並びに変更 */
-    align-items: stretch;
-    padding: 0;
-    position: relative;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start !important;  /* ★ 左寄せを明示 */
   }
+
+  /* ★ ハンバーガーボタンを左端に固定 */
   .tab-menu .hamburger {
-    display: block;
-    align-self: flex-start;    /* 左寄せ */
-    margin-left: 0;
-    padding: 12px 16px;
-    font-size: 2rem;
-    background: #16213e;       /* 背景を付けて視認性UP */
-    width: 100%;
-    text-align: left;
-    border-bottom: 1px solid #2a2a4a;
+    display: block;          /* 表示 */
+    width: auto;
+    flex: 0 0 auto;
+    border-bottom: none;
+    margin-left: 0;          /* ★ 確実に左端 */
+    order: -1;               /* ★ 他の要素より前に配置（念のため） */
   }
   .tab-menu .tab-button {
     display: none;             /* デフォルト非表示 */
@@ -341,14 +339,13 @@
     display: none !important;
   }
   #announcement-mobile {
-    display: inline-block !important;  /* ★ ハンバーガー横に表示 */
+    display: inline-block !important;
     flex: 0 0 auto;
-    margin-left: 8px;
+    margin-left: 8px;        /* ハンバーガーとの間隔 */
     max-width: 150px;
     font-size: 0.85rem;
     padding: 2px 10px;
   }
-
   /* ハンバーガーメニューとアナウンスを横並びにする */
   .tab-menu {
     flex-direction: row !important;
