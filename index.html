@@ -551,6 +551,17 @@ let currentAbortController = null;
       }
     }
 
+    // 画像URLに =rw パラメータを付与（なければ付ける）
+function addRwParam(url) {
+  if (!url || url.includes('placehold.co')) return url;
+  if (url.includes('=rw') || url.includes('=s800-rw')) return url; // 既に付与済み
+  // URLにクエリパラメータがあるかチェック
+  if (url.includes('?')) {
+    return url + '&rw';
+  } else {
+    return url + '=rw';
+  }
+}
 // キャッシュ保存用オブジェクト
 // キャッシュ保存用オブジェクト
 const apiCache = {};
@@ -850,7 +861,7 @@ document.getElementById('search-sort').addEventListener('change', function() {
       const grid = document.getElementById('maker-grid');
       grid.innerHTML = (makers || []).map(m => `
         <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
-          <img src="${m.headerUrl || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
+          <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
           <div class="card-body">
             <h3 class="card-title">${m.makerName}</h3>
             <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
@@ -903,7 +914,7 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
         ${couponBadge}
         ${saleBadge}
         <span class="card-badge">${c.status}</span>
-        <img src="${c.img1 || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
+       <img src="${addRwParam(c.img1) || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
         <div class="card-body">
           <div class="card-subtitle">${c.makerName}</div>
           <h3 class="card-title">${c.carName}</h3>
@@ -939,8 +950,8 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
 
       // スライド更新
       slides.innerHTML = carouselImages.map(url => `
-        <div class="carousel-slide"><img src="${url}" alt="車両画像"></div>
-      `).join('');
+  <div class="carousel-slide"><img src="${addRwParam(url)}" alt="車両画像"></div>
+`).join('');
 
       // ドット更新
       dots.innerHTML = carouselImages.map((_, idx) => `
@@ -979,7 +990,7 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
           const gradeName = selectedOption.value;
           const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
           if (grade && grade.imgUrl) {
-            gradeImgContainer.innerHTML = `<img src="${grade.imgUrl}" alt="${gradeName}">`;
+            gradeImgContainer.innerHTML = `<img src="${addRwParam(grade.imgUrl)}" alt="${gradeName}">`;
           } else {
             gradeImgContainer.innerHTML = `<div class="sub-img-placeholder">画像なし</div>`;
           }
@@ -995,7 +1006,7 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
           const colorName = selectedOption.value;
           const color = currentCarDetail.colors.find(c => c.colorName === colorName);
           if (color && color.imgUrl) {
-            colorImgContainer.innerHTML = `<img src="${color.imgUrl}" alt="${colorName}">`;
+            colorImgContainer.innerHTML = `<img src="${addRwParam(color.imgUrl)}" alt="${colorName}">`;
           } else {
             colorImgContainer.innerHTML = `<div class="sub-img-placeholder">画像なし</div>`;
           }
@@ -1014,7 +1025,9 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
           }
         });
         if (checkedOptions.length > 0) {
-          optionContainer.innerHTML = checkedOptions.map(o => `<img src="${o.imgUrl}" alt="${o.optionName}" title="${o.optionName}">`).join('');
+          optionContainer.innerHTML = checkedOptions.map(o => 
+  `<img src="${addRwParam(o.imgUrl)}" alt="${o.optionName}" title="${o.optionName}">`
+).join('');
         } else {
           optionContainer.innerHTML = `<div class="sub-img-placeholder">選択中のオプションはありません</div>`;
         }
@@ -1419,7 +1432,7 @@ async function loadMypageData() {
 
   statusArea.innerHTML = `
     <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
-      <img src="${maker.iconUrl || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
+      <img src="${addRwParam(maker.iconUrl) || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
       <div>
         <h3>${maker.makerName}</h3>
         <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
