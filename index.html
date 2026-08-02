@@ -630,7 +630,8 @@ function fileToBase64(file, maxWidth = 800, quality = 0.7) {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+           // 変更後（WebP出力）
+const dataUrl = canvas.toDataURL('image/webp', quality);
             resolve(dataUrl);
           };
           img.onerror = error => reject(error);
