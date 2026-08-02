@@ -201,6 +201,70 @@
 #dm-message {
   font-family: inherit;
 }
+    /* ===== スマホ用ハンバーガーメニュー ===== */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.8rem;
+  padding: 8px 12px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+/* スマホ幅での切り替え */
+@media (max-width: 768px) {
+  .tab-menu {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 0 10px;
+    position: relative;
+  }
+  .tab-menu .tab-button {
+    display: none; /* デフォルト非表示 */
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .tab-menu .tab-button.active {
+    border-bottom: 3px solid var(--main-color);
+  }
+  .tab-menu.open .tab-button {
+    display: block; /* ハンバーガー押下で表示 */
+  }
+  .hamburger {
+    display: block;
+  }
+
+  /* ヘッダー内のボタン類を小さく */
+  header {
+    flex-wrap: wrap;
+    padding: 10px 15px;
+  }
+  header h1 {
+    font-size: 1.2rem;
+  }
+  header div {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  #user-display-name {
+    font-size: 0.8rem;
+  }
+  .btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* カードグリッドを1列に */
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
   </style>
 </head>
 <body>
@@ -227,13 +291,14 @@
   </div>
 </header>
 
-  <nav class="tab-menu">
-    <button class="tab-button active" id="tab-btn-home" onclick="switchTab('home')">ホーム</button>
-    <button class="tab-button" id="tab-btn-search" onclick="switchTab('search')">車両検索</button>
-    <button class="tab-button" id="tab-btn-makers" onclick="switchTab('makers')">メーカー一覧</button>
-    <button class="tab-button" id="tab-btn-ranking" onclick="switchTab('ranking')">ランキング</button>
-    <button class="tab-button" id="mypage-tab" onclick="switchTab('mypage')" style="display:none;">マイページ・店舗管理</button>
-  </nav>
+  <nav class="tab-menu" id="tabMenu">
+  <button class="hamburger" id="hamburgerBtn" aria-label="メニュー">☰</button>
+  <button class="tab-button active" id="tab-btn-home" onclick="switchTab('home')">ホーム</button>
+  <button class="tab-button" id="tab-btn-search" onclick="switchTab('search')">車両検索</button>
+  <button class="tab-button" id="tab-btn-makers" onclick="switchTab('makers')">メーカー一覧</button>
+  <button class="tab-button" id="tab-btn-ranking" onclick="switchTab('ranking')">ランキング</button>
+  <button class="tab-button" id="mypage-tab" onclick="switchTab('mypage')" style="display:none;">マイページ・店舗管理</button>
+</nav>
 
   <div class="container">
     <!-- 1. ホームタブ -->
@@ -756,7 +821,31 @@ async function loadHomeCars(force = false) {
   } else {
     renderCarGrid('home-car-grid', cars);
   }
-}// グローバル変数追加（既存のコードの先頭付近に追加）
+}
+    // ハンバーガーメニュー開閉
+document.getElementById('hamburgerBtn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  document.getElementById('tabMenu').classList.toggle('open');
+});
+
+// メニュー外クリックで閉じる（任意）
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('tabMenu');
+  if (!menu.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
+// タブ切り替え時にメニューを閉じる（スマホで自動クローズ）
+const originalSwitchTab = switchTab;
+switchTab = function(tabId) {
+  originalSwitchTab(tabId);
+  const menu = document.getElementById('tabMenu');
+  if (window.innerWidth <= 768) {
+    menu.classList.remove('open');
+  }
+};
+    // グローバル変数追加（既存のコードの先頭付近に追加）
 let currentSearchResults = [];
 let currentSort = 'new';
 
