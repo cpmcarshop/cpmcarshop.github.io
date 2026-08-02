@@ -274,6 +274,28 @@
     grid-template-columns: 1fr;
   }
 }
+    /* デフォルトは非表示（ログイン時のみ表示） */
+#mypage-tab {
+  display: none;
+}
+/* ログイン時に表示（JavaScriptでこのクラスを付与） */
+#mypage-tab.is-visible {
+  display: inline-block;  /* PCではインライン表示 */
+}
+
+/* スマホ時はハンバーガーメニュー内でブロック表示 */
+@media (max-width: 768px) {
+  .tab-menu .tab-button {
+    display: none;
+  }
+  .tab-menu.open .tab-button {
+    display: block;
+  }
+  /* ログイン中はハンバーガー内でも表示させる */
+  #mypage-tab.is-visible {
+    display: block;
+  }
+}
   </style>
 </head>
 <body>
@@ -306,7 +328,7 @@
   <button class="tab-button" id="tab-btn-search" onclick="switchTab('search')">車両検索</button>
   <button class="tab-button" id="tab-btn-makers" onclick="switchTab('makers')">メーカー一覧</button>
   <button class="tab-button" id="tab-btn-ranking" onclick="switchTab('ranking')">ランキング</button>
-  <button class="tab-button" id="mypage-tab" onclick="switchTab('mypage')" style="display:none;">マイページ・店舗管理</button>
+  <button class="tab-button" id="mypage-tab" onclick="switchTab('mypage')">マイページ・店舗管理</button>
 </nav>
 
   <div class="container">
@@ -571,15 +593,14 @@ getRedirectResult(auth)
     console.error('リダイレクトエラー:', error);
   });
 
-    onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     window.currentUser = user;
     document.getElementById('user-display-name').innerText = user.displayName || user.email;
     document.getElementById('auth-btn').innerText = 'ログアウト';
-    document.getElementById('mypage-tab').style.display = 'block';
+    // ★ クラスで表示制御
+    document.getElementById('mypage-tab').classList.add('is-visible');
     
-    // ★ ホームの初期ロードが完了してから実行する ★
-    // ホームがキャッシュ済みかどうか確認してから
     setTimeout(async () => {
       await callGasApi('registerUser', { 
         uid: user.uid, 
@@ -588,13 +609,14 @@ getRedirectResult(auth)
         email: user.email 
       });
       loadMypageData();
-    }, 500); // 少し遅延させてホームの表示を優先
+    }, 500);
     
   } else {
     window.currentUser = null;
     document.getElementById('user-display-name').innerText = '';
     document.getElementById('auth-btn').innerText = 'ログイン / 登録';
-    document.getElementById('mypage-tab').style.display = 'none';
+    // ★ クラスで非表示
+    document.getElementById('mypage-tab').classList.remove('is-visible');
   }
 });
   </script>
