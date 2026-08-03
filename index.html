@@ -1126,7 +1126,6 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
           <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
           ${priceDisplay}
           ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
-          // renderCarGrid内のボタン部分を修正
 <div style="display:flex; gap:5px; flex-wrap:wrap;">
   <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
   <button class="btn btn-secondary" style="flex:0 0 40px; font-size:0.8rem; padding:8px 0;" onclick="event.stopPropagation(); shareCarLink('${c.carId}', '${c.carName}')">📤</button>
@@ -2260,11 +2259,8 @@ function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
   if (carId) {
-    showLoading("データを読み込み中...", "🚗 車両ページを開きます");
-    
-    // 描画を待ってから開く（0ms でもよい）
+    // showLoading は呼ばない（openCarDetail 内で管理）
     setTimeout(() => {
-      // ローディングは openCarDetail 内で管理させる
       openCarDetail(carId).finally(() => {
         // 成功・失敗にかかわらず URL からパラメータを除去
         if (window.history && window.history.replaceState) {
@@ -2275,7 +2271,6 @@ function checkUrlForCar() {
     }, 0);
   }
 }
-
 // loadHomeCars 完了後に URL チェックを実行する（上書き）
 const originalLoadHomeCars = loadHomeCars;
 loadHomeCars = async function(force = false) {
