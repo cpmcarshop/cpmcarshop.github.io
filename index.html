@@ -1246,7 +1246,9 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
 let viewedCarIds = {}; // セッション中のカウント済み車両IDを保持
 
 async function openCarDetail(carId) {
-  const car = await callGasApi('getCarDetail', { carId: carId });
+  // すでにローディングが表示されている場合は、ここでは showLoading を呼ばない
+  // その代わり、callGasApi に showLoadingFlag: false を渡す
+  const car = await callGasApi('getCarDetail', { carId: carId }, false); // ★ 第3引数 false
   if (!car) return;
   currentCarDetail = car;
 
@@ -2260,19 +2262,25 @@ function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
   if (carId) {
+    // ローディングを表示（サブテキスト付き）
     showLoading("データを読み込み中...", "🚗 車両ページを開きます");
-    
-    // 描画を待ってから開く（0ms でもよい）
-    setTimeout(() => {
-      // ローディングは openCarDetail 内で管理させる
-      openCarDetail(carId).finally(() => {
-        // 成功・失敗にかかわらず URL からパラメータを除去
+
+    // openCarDetail が完了したら必ず hideLoading を呼ぶ
+    (async () => {
+      try {
+        await openCarDetail(carId);
+      } catch (e) {
+        console.error('車両詳細の読み込みエラー:', e);
+        showToast('⚠️ 車両の読み込みに失敗しました');
+      } finally {
+        hideLoading(); // ★ 必ず呼ぶ
+        // URL から ?car= パラメータを除去
         if (window.history && window.history.replaceState) {
           const newUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, '', newUrl);
         }
-      });
-    }, 0);
+      }
+    })();
   }
 }
 
