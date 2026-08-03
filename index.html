@@ -516,7 +516,11 @@
         <select id="c-contact-type"><option value="portal">ポータル内注文のみ</option><option value="twitter">Twitter DMへ転送</option></select>
       </div>
       <div class="form-group"><label>Twitter DM転送時の定型文テンプレート</label><input type="text" id="c-contact-detail" value="架空車街から購入希望です！"></div>
-      
+      <!-- car-modal 内の適切な位置（例：contact-detail の下）に追加 -->
+<div class="form-group">
+  <label>関連リンク（任意）</label>
+  <input type="url" id="c-link" placeholder="https://example.com" style="width:100%; padding:10px; background:#0f1428; border:1px solid #333; color:#fff; border-radius:4px; box-sizing:border-box;">
+</div>
       <div class="form-group">
         <label>車両画像（画像1枚目がメイン・サムネイル画像になります）</label>
         <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;">※画像を選択しなかった枠は、既存の画像が保持されます。</div>
@@ -1272,6 +1276,10 @@ async function openCarDetail(carId) {
         </div>
 
         <p>${car.description}</p>
+
+         <!-- ★★★ ここにリンク表示を追加 ★★★ -->
+  ${car.link ? `<p><a href="${car.link}" target="_blank" rel="noopener" style="color:var(--main-color); text-decoration:underline;">関連リンク</a></p>` : ''}
+
 
         <h4>1. グレード選択</h4>
         <select id="buy-grade" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
@@ -2058,6 +2066,7 @@ function addGradeForm(data = {}) {
       document.getElementById('c-price-range').value = '';
       document.getElementById('c-contact-type').value = 'portal';
       document.getElementById('c-contact-detail').value = '架空車街から購入希望です！';
+      document.getElementById('c-link').value = '';
       
       document.getElementById('grade-container').innerHTML = '';
       document.getElementById('color-container').innerHTML = '';
@@ -2067,9 +2076,11 @@ function addGradeForm(data = {}) {
     }
 
     async function editCar(carId) {
-      const car = await callGasApi('getCarDetail', { carId: carId });
-      if (!car) return;
+  const car = await callGasApi('getCarDetail', { carId: carId });
+  if (!car) return;
 
+  // 既存のセット処理に追加
+      document.getElementById('c-link').value = car.link || '';
       document.getElementById('car-modal-title').innerText = "車両データの編集";
       document.getElementById('c-id').value = car.carId;
       document.getElementById('c-name').value = car.carName || '';
@@ -2177,6 +2188,7 @@ function addGradeForm(data = {}) {
         priceRange: document.getElementById('c-price-range').value,
         contactType: document.getElementById('c-contact-type').value,
         contactDetail: document.getElementById('c-contact-detail').value,
+        link: document.getElementById('c-link').value,  // ★ 追加
         img1Base64: await fileToBase64(document.getElementById('c-img1').files[0]),
         img2Base64: await fileToBase64(document.getElementById('c-img2').files[0]),
         img3Base64: await fileToBase64(document.getElementById('c-img3').files[0]),
