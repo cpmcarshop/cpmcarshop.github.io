@@ -370,16 +370,18 @@
 <body>
 
   <!-- ローディング表示用要素（テキスト追加） -->
-  <div id="global-loading">
-    <div class="spinner"></div>
-    <div id="loading-text">データを読み込み中...</div>
-    <!-- 追加: フッターテキスト -->
-    <div style="margin-top: 20px; font-size: 0.8rem; color: #888; text-align: center; line-height: 1.6;">
-      ＊いつまでたっても進まない場合はページを再読み込みしてください。<br>
-      PRODUCED BY MPEK Group<br>
-      架空車街はMPEK Groupによって運営されています。
-    </div>
+  <!-- ローディング表示用要素（修正） -->
+<div id="global-loading">
+  <div class="spinner"></div>
+  <div id="loading-text">データを読み込み中...</div>
+  <div id="loading-sub" style="margin-top: 8px; font-size: 0.9rem; color: #aaa;"></div>
+  <!-- 追加: フッターテキスト -->
+  <div style="margin-top: 20px; font-size: 0.8rem; color: #888; text-align: center; line-height: 1.6;">
+    ※いつまでたっても進まない場合はページを再読み込みしてください。<br>
+    PRODUCED BY MPEK Group<br>
+    架空車街はMPEK Groupによって運営されています。
   </div>
+</div>
 
   <header>
   <!-- h1 と PC用アナウンスを横並びに -->
@@ -708,15 +710,19 @@ let currentAbortController = null;
     // ローディング状態管理カウンター
     let activeApiRequests = 0;
 
-    function showLoading(text = "データを処理中...") {
-      activeApiRequests++;
-      const loadingEl = document.getElementById('global-loading');
-      if (loadingEl) {
-        document.getElementById('loading-text').innerText = text;
-        loadingEl.style.display = 'flex';
-      }
+   function showLoading(text = "データを処理中...", subText = "") {
+  activeApiRequests++;
+  const loadingEl = document.getElementById('global-loading');
+  if (loadingEl) {
+    document.getElementById('loading-text').innerText = text;
+    const subEl = document.getElementById('loading-sub');
+    if (subEl) {
+      subEl.innerText = subText;
+      subEl.style.display = subText ? 'block' : 'none';
     }
-
+    loadingEl.style.display = 'flex';
+  }
+}
     function hideLoading() {
       activeApiRequests--;
       if (activeApiRequests <= 0) {
@@ -1120,13 +1126,15 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
           <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
           ${priceDisplay}
           ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
-          <div style="display:flex; gap:5px;">
-            <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
-            ${isMyCars ? `
-              <button class="btn btn-secondary" style="flex:1;" onclick="editCar('${c.carId}')">編集</button>
-              <button class="btn btn-danger" style="flex:1;" onclick="deleteCar('${c.carId}')">削除</button>
-            ` : ''}
-          </div>
+          // renderCarGrid内のボタン部分を修正
+<div style="display:flex; gap:5px; flex-wrap:wrap;">
+  <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
+  <button class="btn btn-secondary" style="flex:0 0 40px; font-size:0.8rem; padding:8px 0;" onclick="event.stopPropagation(); shareCarLink('${c.carId}', '${c.carName}')">📤</button>
+  ${isMyCars ? `
+    <button class="btn btn-secondary" style="flex:1;" onclick="editCar('${c.carId}')">編集</button>
+    <button class="btn btn-danger" style="flex:1;" onclick="deleteCar('${c.carId}')">削除</button>
+  ` : ''}
+</div>
         </div>
       </div>
     `;
@@ -1261,9 +1269,16 @@ async function openCarDetail(carId) {
       carouselIndex = 0;
 
       const body = document.getElementById('detail-modal-body');
-      body.innerHTML = `
-        <h2>${car.carName}</h2>
-        <p style="color:var(--main-color);">${car.maker ? car.maker.makerName : ''}</p>
+     body.innerHTML = `
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+    <div>
+      <h2 style="margin:0;">${car.carName}</h2>
+      <p style="color:var(--main-color); margin:5px 0;">${car.maker ? car.maker.makerName : ''}</p>
+    </div>
+    <button class="btn btn-secondary" onclick="shareCarLink('${car.carId}', '${car.carName}')" style="font-size:0.85rem; padding:6px 14px;">
+      📤 共有
+    </button>
+  </div>
 
         <!-- カルーセル -->
         <div id="carousel-container" class="carousel-container">
@@ -1743,7 +1758,44 @@ function showToast(text) {
   setTimeout(() => toast.remove(), 3000);
 }
 
+// 共有関数
+function shareCarLink(carId, carName) {
+  const url = window.location.origin + window.location.pathname + '?car=' + carId;
+  const shareData = {
+    title: carName + ' - 架空車街',
+    text: carName + ' の詳細を見る',
+    url: url
+  };
 
+  if (navigator.share) {
+    // スマホの共有シート
+    navigator.share(shareData).catch(() => {});
+  } else if (navigator.clipboard) {
+    // クリップボードコピー（PC）
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('✅ リンクをコピーしました');
+    }).catch(() => {
+      // フォールバック
+      fallbackCopy(url);
+    });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast('✅ リンクをコピーしました');
+  } catch(e) {
+    showToast('⚠️ コピーに失敗しました');
+  }
+  document.body.removeChild(textarea);
+}
 
 function openTwitterDmModal(message, twitterId, orderId = null) {
   // メッセージをセット
@@ -2203,6 +2255,59 @@ function addGradeForm(data = {}) {
         loadMypageData();
       }
     }
+
+    // ★★★ URLパラメータチェック（初期表示完了後に実行） ★★★
+function checkUrlForCar() {
+  const params = new URLSearchParams(window.location.search);
+  const carId = params.get('car');
+  if (carId) {
+    // 読み込み中メッセージを変更
+    showLoading("データを読み込み中...", "🚗 車両ページを開きます");
+    
+    // ホームの読み込み完了を待ってから詳細を開く
+    const checkAndOpen = () => {
+      const cacheKey = 'getCars{"sortBy":"view"}';
+      const cached = apiCache[cacheKey];
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        hideLoading();
+        setTimeout(() => {
+          openCarDetail(carId);
+          if (window.history && window.history.replaceState) {
+            const newUrl = window.location.origin + window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+          }
+        }, 300);
+        return;
+      }
+      setTimeout(checkAndOpen, 500);
+    };
+    
+    let attempts = 0;
+    const maxAttempts = 20;
+    const originalCheck = checkAndOpen;
+    checkAndOpen = function() {
+      attempts++;
+      if (attempts > maxAttempts) {
+        hideLoading();
+        showToast('⚠️ 車両の読み込みに時間がかかっています。再読み込みしてください。');
+        return;
+      }
+      originalCheck();
+    };
+    
+    setTimeout(checkAndOpen, 100);
+  }
+}
+
+// loadHomeCars 完了後に URL チェックを実行する（上書き）
+const originalLoadHomeCars = loadHomeCars;
+loadHomeCars = async function(force = false) {
+  await originalLoadHomeCars(force);
+  if (!window._urlChecked) {
+    window._urlChecked = true;
+    checkUrlForCar();
+  }
+};
 
     // 初期表示
 loadHomeCars();
