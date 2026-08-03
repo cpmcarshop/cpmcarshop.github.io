@@ -724,13 +724,15 @@ let currentAbortController = null;
   }
 }
     function hideLoading() {
-      activeApiRequests--;
-      if (activeApiRequests <= 0) {
-        activeApiRequests = 0;
-        const loadingEl = document.getElementById('global-loading');
-        if (loadingEl) loadingEl.style.display = 'none';
-      }
-    }
+  activeApiRequests--;
+  console.log('🔄 hideLoading: activeApiRequests =', activeApiRequests);
+  if (activeApiRequests <= 0) {
+    activeApiRequests = 0;
+    const loadingEl = document.getElementById('global-loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+    console.log('✅ ローディング非表示');
+  }
+}
 
     // 画像URLに =rw パラメータを付与（なければ付ける）
 function addRwParam(url) {
@@ -2257,15 +2259,12 @@ function addGradeForm(data = {}) {
         loadMypageData();
       }
     }
-
 function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
   if (carId) {
-    // ローディングを表示（サブテキスト付き）
     showLoading("データを読み込み中...", "🚗 車両ページを開きます");
 
-    // openCarDetail が完了したら必ず hideLoading を呼ぶ
     (async () => {
       try {
         await openCarDetail(carId);
@@ -2273,8 +2272,12 @@ function checkUrlForCar() {
         console.error('車両詳細の読み込みエラー:', e);
         showToast('⚠️ 車両の読み込みに失敗しました');
       } finally {
-        hideLoading(); // ★ 必ず呼ぶ
-        // URL から ?car= パラメータを除去
+        // ★ 強制的にローディングを非表示にする
+        activeApiRequests = 0;
+        const loadingEl = document.getElementById('global-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        
+        // URL から ?car= を除去
         if (window.history && window.history.replaceState) {
           const newUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, '', newUrl);
