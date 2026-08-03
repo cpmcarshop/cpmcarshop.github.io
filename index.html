@@ -424,7 +424,7 @@
       <option value="セダン">セダン</option>
       <option value="SUV">SUV</option>
       <option value="スポーツ">スポーツ</option>
-      <option value="軽トラ/商用">軽トラ/商用</option>
+      <option value="中古車">中古車</option>
       <option value="その他">その他</option>
     </select>
     <!-- ★ 追加: ソート選択 -->
@@ -498,7 +498,7 @@
         <select id="c-genre">
           <option value="クーペ">クーペ</option><option value="セダン">セダン</option>
           <option value="SUV">SUV</option><option value="スポーツ">スポーツ</option>
-          <option value="軽トラ/商用">軽トラ/商用</option><option value="その他">その他</option>
+          <option value="中古車">中古車</option><option value="その他">その他</option>
         </select>
       </div>
       <div class="form-group">
@@ -2059,7 +2059,7 @@ function addGradeForm(data = {}) {
       document.getElementById('car-modal-title').innerText = "架空車両の新規出品";
       document.getElementById('c-id').value = '';
       document.getElementById('c-name').value = '';
-      document.getElementById('c-genre').value = 'クーペ';
+      document.getElementById('c-genre').value = 'その他';
       document.getElementById('c-production').value = '量産車';
       document.getElementById('c-status').value = '販売中';
       document.getElementById('c-desc').value = '';
@@ -2084,7 +2084,7 @@ function addGradeForm(data = {}) {
       document.getElementById('car-modal-title').innerText = "車両データの編集";
       document.getElementById('c-id').value = car.carId;
       document.getElementById('c-name').value = car.carName || '';
-      document.getElementById('c-genre').value = car.genre || 'クーペ';
+      document.getElementById('c-genre').value = car.genre || 'その他';
       document.getElementById('c-production').value = car.productionType || '量産車';
       document.getElementById('c-status').value = car.status || '販売中';
       document.getElementById('c-desc').value = car.description || '';
