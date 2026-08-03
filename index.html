@@ -1247,10 +1247,6 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
 let viewedCarIds = {}; // セッション中のカウント済み車両IDを保持
 
 async function openCarDetail(carId) {
-  // すでにローディングが表示されている場合は、ここでは showLoading を呼ばない
-  // その代わり、callGasApi に showLoadingFlag: false を渡す
-  const car = await callGasApi('getCarDetail', { carId: carId }, false); // ★ 第3引数 false
-  if (!car) return;async function openCarDetail(carId) {
   // ★ 第3引数を true に変更 → ローディング表示が有効になる
   const car = await callGasApi('getCarDetail', { carId: carId }, true);
   if (!car) {
@@ -1266,7 +1262,6 @@ async function openCarDetail(carId) {
     viewedCarIds[carId] = true;
     setTimeout(async () => {
       try {
-        // ★ 第3引数に false を渡してローディング表示をスキップ
         await callGasApi('incrementViewCount', { carId: carId }, false);
         console.log('視聴数カウント: ' + carId);
       } catch (e) {
@@ -1274,6 +1269,7 @@ async function openCarDetail(carId) {
       }
     }, 3000);
   }
+
 
       // 画像リストを構築（img1〜img4 で有効なもの）
       carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
@@ -2270,22 +2266,20 @@ function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
   if (carId) {
-    // ★ 二重ローディングを避けるため、showLoading の呼び出しを削除
-    // （openCarDetail 内部でローディングを制御するため）
+    // ★ showLoading の呼び出しを削除（openCarDetail 内部でローディングを制御するため）
 
     (async () => {
       try {
         await openCarDetail(carId);
       } catch (e) {
         console.error('車両詳細の読み込みエラー:', e);
-        // ★ エラー時はトーストでユーザーに通知（ローディングは openCarDetail 内で解除済み）
+        // ★ エラー時はトーストでユーザーに通知
         showToast('⚠️ 車両の読み込みに失敗しました');
       } finally {
-        // ★ 万が一ローディングが残った場合の強制解除（二重安全策）
+        // ★ 万が一ローディングが残った場合の強制解除
         activeApiRequests = 0;
         const loadingEl = document.getElementById('global-loading');
         if (loadingEl) loadingEl.style.display = 'none';
-        // URL から ?car= を除去
         if (window.history && window.history.replaceState) {
           const newUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, '', newUrl);
@@ -2294,7 +2288,6 @@ function checkUrlForCar() {
     })();
   }
 }
-
 // loadHomeCars 完了後に URL チェックを実行する（上書き）
 const originalLoadHomeCars = loadHomeCars;
 loadHomeCars = async function(force = false) {
