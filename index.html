@@ -724,15 +724,13 @@ let currentAbortController = null;
   }
 }
     function hideLoading() {
-  activeApiRequests--;
-  console.log('🔄 hideLoading: activeApiRequests =', activeApiRequests);
-  if (activeApiRequests <= 0) {
-    activeApiRequests = 0;
-    const loadingEl = document.getElementById('global-loading');
-    if (loadingEl) loadingEl.style.display = 'none';
-    console.log('✅ ローディング非表示');
-  }
-}
+      activeApiRequests--;
+      if (activeApiRequests <= 0) {
+        activeApiRequests = 0;
+        const loadingEl = document.getElementById('global-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+      }
+    }
 
     // 画像URLに =rw パラメータを付与（なければ付ける）
 function addRwParam(url) {
@@ -1248,9 +1246,7 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
 let viewedCarIds = {}; // セッション中のカウント済み車両IDを保持
 
 async function openCarDetail(carId) {
-  // すでにローディングが表示されている場合は、ここでは showLoading を呼ばない
-  // その代わり、callGasApi に showLoadingFlag: false を渡す
-  const car = await callGasApi('getCarDetail', { carId: carId }, false); // ★ 第3引数 false
+  const car = await callGasApi('getCarDetail', { carId: carId });
   if (!car) return;
   currentCarDetail = car;
 
@@ -2259,31 +2255,24 @@ function addGradeForm(data = {}) {
         loadMypageData();
       }
     }
+
 function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
   if (carId) {
     showLoading("データを読み込み中...", "🚗 車両ページを開きます");
-
-    (async () => {
-      try {
-        await openCarDetail(carId);
-      } catch (e) {
-        console.error('車両詳細の読み込みエラー:', e);
-        showToast('⚠️ 車両の読み込みに失敗しました');
-      } finally {
-        // ★ 強制的にローディングを非表示にする
-        activeApiRequests = 0;
-        const loadingEl = document.getElementById('global-loading');
-        if (loadingEl) loadingEl.style.display = 'none';
-        
-        // URL から ?car= を除去
+    
+    // 描画を待ってから開く（0ms でもよい）
+    setTimeout(() => {
+      // ローディングは openCarDetail 内で管理させる
+      openCarDetail(carId).finally(() => {
+        // 成功・失敗にかかわらず URL からパラメータを除去
         if (window.history && window.history.replaceState) {
           const newUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, '', newUrl);
         }
-      }
-    })();
+      });
+    }, 0);
   }
 }
 
