@@ -395,14 +395,15 @@
 </div>
 
   <header>
-  <!-- h1 と PC用アナウンスを横並びに -->
   <div style="display: flex; align-items: center;">
     <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY MPEK Group</span></h1>
-    <div id="announcement-pc" class="announcement"></div>  <!-- ★ ここにPC用 -->
+    <div id="announcement-pc" class="announcement"></div>
   </div>
   <div>
     <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
     <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">お問い合わせ</button>
+    <!-- ★ 追加：掲示板に行くボタン -->
+    <button class="btn btn-secondary" onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank')" style="margin-right: 5px;">掲示板に行く</button>
     <button class="btn" id="auth-btn">ログイン / 登録</button>
   </div>
 </header>
