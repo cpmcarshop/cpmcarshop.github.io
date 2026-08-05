@@ -1553,6 +1553,17 @@ async function executePurchase() {
     return;
   }
 
+  // ★★★ 自社購入チェック ★★★
+  const buyerMaker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  const carMakerId = currentCarDetail.makerId;
+  const developerMakerId = 'MK-92675a74'; // 開発者用ID（このIDなら購入可能）
+
+  if (buyerMaker && buyerMaker.makerId === carMakerId && buyerMaker.makerId !== developerMakerId) {
+    alert('ご自身のメーカーが出品した車両は購入できません。');
+    return;
+  }
+
+
   const grade = document.getElementById('buy-grade').value;
   const color = document.getElementById('buy-color').value;
   const options = [];
@@ -2142,7 +2153,7 @@ function addGradeForm(data = {}) {
       document.getElementById('c-status').value = '販売中';
       document.getElementById('c-desc').value = '';
       document.getElementById('c-price-range').value = '';
-      document.getElementById('c-contact-type').value = 'portal';
+      document.getElementById('c-contact-type').value = 'twitter';  
       document.getElementById('c-contact-detail').value = '架空車街から購入希望です！';
       document.getElementById('c-link').value = '';
       
@@ -2167,7 +2178,7 @@ function addGradeForm(data = {}) {
       document.getElementById('c-status').value = car.status || '販売中';
       document.getElementById('c-desc').value = car.description || '';
       document.getElementById('c-price-range').value = car.priceRange || '';
-      document.getElementById('c-contact-type').value = car.contactType || 'portal';
+      document.getElementById('c-contact-type').value = 'twitter';
       document.getElementById('c-contact-detail').value = car.contactDetail || '';
 
       const gContainer = document.getElementById('grade-container');
