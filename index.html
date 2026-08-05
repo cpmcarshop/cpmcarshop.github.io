@@ -492,6 +492,7 @@
       <h3 id="maker-modal-title">メーカー情報の登録</h3>
       <div class="form-group"><label>メーカー名</label><input type="text" id="m-name"></div>
       <div class="form-group"><label>説明・ブランドコンセプト</label><textarea id="m-desc" rows="3"></textarea></div>
+      <div class="form-group"><label>CPM ID</label><input type="text" id="m-cpmid" placeholder="例: AB123456"></div>
       <div class="form-group"><label>Twitter(X) ID (@なし)</label><input type="text" id="m-twitter"></div>
       <div class="form-group"><label>自由リンク(HP等)</label><input type="text" id="m-link"></div>
       <div class="form-group"><label>アイコン画像</label><input type="file" id="m-icon" accept="image/*"></div>
@@ -1074,21 +1075,21 @@ document.getElementById('search-sort').addEventListener('change', function() {
 }
 
     async function loadMakers() {
-      const makers = await callGasApi('getMakers');
-      const grid = document.getElementById('maker-grid');
-      grid.innerHTML = (makers || []).map(m => `
-        <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
-          <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
-          <div class="card-body">
-            <h3 class="card-title">${m.makerName}</h3>
-            <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
-            <p style="font-size:0.85rem;">Twitter: @${m.twitterId}</p>
-            <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
-          </div>
-        </div>
-      `).join('');
-    }
-
+  const makers = await callGasApi('getMakers');
+  const grid = document.getElementById('maker-grid');
+  grid.innerHTML = (makers || []).map(m => `
+    <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
+      <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
+      <div class="card-body">
+        <h3 class="card-title">${m.makerName}</h3>
+        <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
+        ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${m.cpmId}</p>` : ''}
+        <p style="font-size:0.85rem;">Twitter: @${m.twitterId}</p>
+        <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
+      </div>
+    </div>
+  `).join('');
+}
     // 1枚目(img1)をメイン画像として描画
  // 1枚目(img1)をメイン画像として描画（showRank オプション追加）
 function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
@@ -1647,8 +1648,10 @@ async function executePurchase() {
 async function loadMypageData() {
   if (!window.currentUser) return;
   const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  // loadMypageData 内の maker 取得直後
+window._currentMaker = maker;
+  
   const statusArea = document.getElementById('maker-status-area');
-
   if (!maker) {
     statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
     const existingAdmin = document.getElementById('admin-sections');
@@ -1659,16 +1662,18 @@ async function loadMypageData() {
   // ★ 自社車両一覧を先に取得（セレクトボックス用）
   const myCars = await callGasApi('getCars', { makerId: maker.makerId });
 
-  statusArea.innerHTML = `
-    <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
-      <img src="${addRwParam(maker.iconUrl) || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
-      <div>
-        <h3>${maker.makerName}</h3>
-        <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
-        <button class="btn btn-secondary" onclick="openMakerModal()">メーカー情報を編集</button>
-      </div>
+  // statusArea.innerHTML 内にCPM IDを追加
+statusArea.innerHTML = `
+  <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
+    <img src="${addRwParam(maker.iconUrl) || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
+    <div>
+      <h3>${maker.makerName}</h3>
+      <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
+      ${maker.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${maker.cpmId}</p>` : ''}
+      <button class="btn btn-secondary" onclick="openMakerModal()">メーカー情報を編集</button>
     </div>
-  `;
+  </div>
+`;
 
   // ★ 管理セクションを1つのコンテナにまとめる
   const existingAdmin = document.getElementById('admin-sections');
@@ -2116,7 +2121,16 @@ function addGradeForm(data = {}) {
   `);
 }
 
-    function openMakerModal() { document.getElementById('maker-modal').style.display = 'flex'; }
+    function openMakerModal() {
+  const maker = window._currentMaker; // loadMypageData でセット済み
+  document.getElementById('maker-modal-title').innerText = maker ? "メーカー情報の編集" : "メーカー情報の登録";
+  document.getElementById('m-name').value = maker?.makerName || '';
+  document.getElementById('m-desc').value = maker?.description || '';
+  document.getElementById('m-twitter').value = maker?.twitterId || '';
+  document.getElementById('m-link').value = maker?.customLink || '';
+  document.getElementById('m-cpmid').value = maker?.cpmId || '';
+  document.getElementById('maker-modal').style.display = 'flex';
+}
     
     function openCarModal() {
       document.getElementById('car-modal-title').innerText = "架空車両の新規出品";
@@ -2183,23 +2197,24 @@ function addGradeForm(data = {}) {
       document.getElementById('car-modal').style.display = 'flex';
     }
 
-    async function submitMaker() {
-      const payload = {
-        uid: window.currentUser.uid,
-        makerName: document.getElementById('m-name').value,
-        description: document.getElementById('m-desc').value,
-        twitterId: document.getElementById('m-twitter').value,
-        customLink: document.getElementById('m-link').value,
-        iconBase64: await fileToBase64(document.getElementById('m-icon').files[0]),
-        headerBase64: await fileToBase64(document.getElementById('m-header').files[0])
-      };
-      const res = await callGasApi('saveMaker', payload);
-      if (res) {
-        alert(res.message);
-        closeModal('maker-modal');
-        loadMypageData();
-      }
-    }
+   async function submitMaker() {
+  const payload = {
+    uid: window.currentUser.uid,
+    makerName: document.getElementById('m-name').value,
+    description: document.getElementById('m-desc').value,
+    twitterId: document.getElementById('m-twitter').value,
+    customLink: document.getElementById('m-link').value,
+    cpmId: document.getElementById('m-cpmid').value, // ★ 追加
+    iconBase64: await fileToBase64(document.getElementById('m-icon').files[0]),
+    headerBase64: await fileToBase64(document.getElementById('m-header').files[0])
+  };
+  const res = await callGasApi('saveMaker', payload);
+  if (res) {
+    alert(res.message);
+    closeModal('maker-modal');
+    loadMypageData();
+  }
+}
 
     async function submitCar() {
       const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
