@@ -1088,18 +1088,31 @@ document.getElementById('search-sort').addEventListener('change', function() {
     async function loadMakers() {
   const makers = await callGasApi('getMakers');
   const grid = document.getElementById('maker-grid');
-  grid.innerHTML = (makers || []).map(m => `
-    <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
-      <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
-      <div class="card-body">
-        <h3 class="card-title">${m.makerName}</h3>
-        <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
-        ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${m.cpmId}</p>` : ''}
-        <p style="font-size:0.85rem;">Twitter: @${m.twitterId}</p>
-        <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
+  grid.innerHTML = (makers || []).map(m => {
+    // Twitterリンク（@を除去してURLを生成）
+    const twitterUrl = m.twitterId ? `https://twitter.com/${m.twitterId.replace(/^@/, '')}` : null;
+    const homepageUrl = m.customLink && m.customLink.trim() !== '' ? m.customLink : null;
+    
+    return `
+      <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
+        <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px;">
+        <div class="card-body">
+          <h3 class="card-title">${m.makerName}</h3>
+          <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
+          ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${m.cpmId}</p>` : ''}
+          
+          <!-- ★ ここから追加：SNS・ホームページリンクボタン -->
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
+            ${twitterUrl ? `<a href="${twitterUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#1DA1F2; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;">🐦 Twitter</a>` : ''}
+            ${homepageUrl ? `<a href="${homepageUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#4CAF50; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;">🌐 ホームページ</a>` : ''}
+          </div>
+          <!-- ★ ここまで追加 -->
+
+          <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
     // 1枚目(img1)をメイン画像として描画
  // 1枚目(img1)をメイン画像として描画（showRank オプション追加）
@@ -2220,13 +2233,17 @@ function addGradeForm(data = {}) {
     }
 
    async function submitMaker() {
+  // ★ Twitter IDを正規化（先頭の@・＠を除去）
+  let twitterId = document.getElementById('m-twitter').value.trim();
+  twitterId = twitterId.replace(/^[@＠]+/, ''); // 先頭の@（半角・全角）を除去
+
   const payload = {
     uid: window.currentUser.uid,
     makerName: document.getElementById('m-name').value,
     description: document.getElementById('m-desc').value,
-    twitterId: document.getElementById('m-twitter').value,
+    twitterId: twitterId, // ← 正規化したものを使用
     customLink: document.getElementById('m-link').value,
-    cpmId: document.getElementById('m-cpmid').value, // ★ 追加
+    cpmId: document.getElementById('m-cpmid').value,
     iconBase64: await fileToBase64(document.getElementById('m-icon').files[0]),
     headerBase64: await fileToBase64(document.getElementById('m-header').files[0])
   };
