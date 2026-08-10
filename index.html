@@ -880,12 +880,14 @@ let currentAbortController = null;
 
     // ローディング状態管理カウンター
     let activeApiRequests = 0;
-
-   function showLoading(text = "データを処理中...", subText = "") {
+    
+function showLoading(text = "データを処理中...", subText = "") {
   activeApiRequests++;
   const loadingEl = document.getElementById('global-loading');
   if (loadingEl) {
-    document.getElementById('loading-text').innerText = text;
+    // ★ 要素が存在する場合のみ更新（存在しない場合は無視）
+    const textEl = document.getElementById('loading-text');
+    if (textEl) textEl.innerText = text;
     const subEl = document.getElementById('loading-sub');
     if (subEl) {
       subEl.innerText = subText;
@@ -894,15 +896,15 @@ let currentAbortController = null;
     loadingEl.style.display = 'flex';
   }
 }
-    function hideLoading() {
-      activeApiRequests--;
-      if (activeApiRequests <= 0) {
-        activeApiRequests = 0;
-        const loadingEl = document.getElementById('global-loading');
-        if (loadingEl) loadingEl.style.display = 'none';
-      }
-    }
 
+function hideLoading() {
+  activeApiRequests--;
+  if (activeApiRequests <= 0) {
+    activeApiRequests = 0;
+    const loadingEl = document.getElementById('global-loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+  }
+}
     // 画像URLに =rw パラメータを付与（なければ付ける）
 function addRwParam(url) {
   if (!url || url.includes('placehold.co')) return url;
