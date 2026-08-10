@@ -1086,16 +1086,26 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
   window.signInWithPopup(window.firebaseAuth, provider)
     .then(() => closeModal('auth-modal'))
     .catch((error) => {
-      // ポップアップがブロックされた場合やユーザーが閉じた場合
+      // ポップアップがブロックされた場合 → リダイレクト方式にフォールバック
       if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-        // リダイレクト方式にフォールバック
-        window.signInWithRedirect(window.firebaseAuth, provider);
+        // ★ リダイレクト前に sessionStorage が使えるか簡単にチェック（任意）
+        try {
+          sessionStorage.setItem('test', 'test');
+          sessionStorage.removeItem('test');
+          window.signInWithRedirect(window.firebaseAuth, provider);
+        } catch (e) {
+          // sessionStorage が使えない場合はポップアップ再試行を促す
+          alert(
+            'お使いのブラウザのプライバシー設定が原因でログインできません。\n' +
+            'ポップアップを許可するか、別のブラウザをお試しください。'
+          );
+        }
       } else {
+        // その他のエラー（ネットワークエラーなど）
         alert('ログインエラー: ' + error.message);
       }
     });
 }
-
     function handleEmailAuth(type) {
   const email = document.getElementById('auth-email').value;
   const pass = document.getElementById('auth-password').value;
