@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>追放されました</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0a0c1b;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      padding: 30px;
+      background: #16213e;
+      border-radius: 12px;
+      border: 2px solid #e94560;
+      box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+    }
+    h1 {
+      color: #e94560;
+      font-size: 2rem;
+      margin-top: 0;
+    }
+    .period {
+      font-size: 1.4rem;
+      color: #ffd93d;
+      margin: 20px 0;
+    }
+    p {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: #ccc;
+    }
+    img {
+      max-width: 80%;
+      height: auto;
+      margin-top: 25px;
+      border-radius: 8px;
+      border: 1px solid #444;
+    }
+    .footer {
+      margin-top: 30px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚫 あなたは架空車街から追放されました</h1>
+    <div class="period" id="ban-period">
+      期間: <strong>読み込み中...</strong>
+    </div>
+    <p>
+      • 架空車街は利用できません。<br>
+      • 登録、更新など操作は禁止されています。
+    </p>
+    <!-- ★ 相対パスでOK！ ★ -->
+    <img src="ohno.gif" alt="Oh No!">
+    <div class="footer">架空車街 Produced by MPEK Group</div>
+  </div>
+
+  <script>
+    // URLパラメータから日数を取得して表示
+    const params = new URLSearchParams(window.location.search);
+    const days = params.get('days') || '';
+
+    const periodEl = document.getElementById('ban-period');
+    if (days === 'permanent') {
+      periodEl.innerHTML = '期間: <strong>無期限</strong>';
+    } else if (days && !isNaN(days)) {
+      periodEl.innerHTML = `期間: <strong>${days} 日間</strong>`;
+    } else {
+      periodEl.innerHTML = '期間: <strong>不明</strong>';
+    }
+  </script>
+</body>
+</html>
