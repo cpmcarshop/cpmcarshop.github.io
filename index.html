@@ -1366,7 +1366,16 @@ document.getElementById('search-sort').addEventListener('change', function() {
   grid.innerHTML = (makers || []).map(m => {
     // Twitterリンク（@を除去してURLを生成）
     const twitterUrl = m.twitterId ? `https://twitter.com/${m.twitterId.replace(/^@/, '')}` : null;
-    const homepageUrl = m.customLink && m.customLink.trim() !== '' ? m.customLink : null;
+    
+    // ★ 修正: スキームがない場合は https:// を付与
+    let homepageUrl = null;
+    if (m.customLink && m.customLink.trim() !== '') {
+      let link = m.customLink.trim();
+      if (!/^https?:\/\//i.test(link)) {
+        link = 'https://' + link;
+      }
+      homepageUrl = link;
+    }
     
     return `
       <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
@@ -1376,12 +1385,11 @@ document.getElementById('search-sort').addEventListener('change', function() {
           <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
           ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${m.cpmId}</p>` : ''}
           
-          <!-- ★ ここから追加：SNS・ホームページリンクボタン -->
+          <!-- ★ 修正: イベントバブリングを停止 -->
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
-            ${twitterUrl ? `<a href="${twitterUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#1DA1F2; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;">🐦 Twitter</a>` : ''}
-            ${homepageUrl ? `<a href="${homepageUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#4CAF50; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;">🌐 ホームページ</a>` : ''}
+            ${twitterUrl ? `<a href="${twitterUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#1DA1F2; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🐦 Twitter</a>` : ''}
+            ${homepageUrl ? `<a href="${homepageUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#4CAF50; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🌐 ホームページ</a>` : ''}
           </div>
-          <!-- ★ ここまで追加 -->
 
           <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
         </div>
