@@ -703,16 +703,25 @@ onAuthStateChanged(auth, async (user) => {
     window.currentUser = user;
     document.getElementById('user-display-name').innerText = user.displayName || user.email;
     document.getElementById('auth-btn').innerText = 'ログアウト';
-    // ★ クラスで表示制御
     document.getElementById('mypage-tab').classList.add('is-visible');
     
+    // ★ ユーザー情報を登録・更新（名前は空文字を許容）
+    const userInfo = await callGasApi('registerUser', { 
+      uid: user.uid, 
+      name: user.displayName || '',   // 空文字を渡す（デフォルトを使わない）
+      username: user.email.split('@')[0] || '',
+      email: user.email 
+    });
+    
+    // ★ name が空文字ならモーダル表示（「ユーザー」という文字列は判定に使わない）
+    if (userInfo && userInfo.name === '') {
+      showUsernameModal(user.uid);
+    } else {
+      // 既に設定済みの名前でヘッダーを更新
+      document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
+    }
+    
     setTimeout(async () => {
-      await callGasApi('registerUser', { 
-        uid: user.uid, 
-        name: user.displayName || 'ユーザー', 
-        username: user.email.split('@')[0], 
-        email: user.email 
-      });
       loadMypageData();
     }, 500);
     
@@ -720,7 +729,6 @@ onAuthStateChanged(auth, async (user) => {
     window.currentUser = null;
     document.getElementById('user-display-name').innerText = '';
     document.getElementById('auth-btn').innerText = 'ログイン / 登録';
-    // ★ クラスで非表示
     document.getElementById('mypage-tab').classList.remove('is-visible');
   }
 });
@@ -1068,6 +1076,51 @@ function resetSearchFilter() {
   document.getElementById('search-sort').value = 'new'; // ★追加
   currentSort = 'new';
   executeSearch();
+}
+
+    // ユーザー名設定モーダルを表示（閉じられないように制御）
+function showUsernameModal(uid) {
+  const modal = document.getElementById('username-modal');
+  modal.style.display = 'flex';
+  // 背景クリックで閉じないように
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      // 何もしない（閉じない）
+    }
+  };
+  document.getElementById('username-input').value = '';
+  setTimeout(() => document.getElementById('username-input').focus(), 100);
+}
+
+// ユーザー名を保存（B列・C列に同じ値を書き込む）
+async function saveUsername() {
+  const newName = document.getElementById('username-input').value.trim();
+  if (!newName) {
+    alert('表示名を入力してください。');
+    return;
+  }
+  const user = window.currentUser;
+  if (!user) {
+    alert('ログイン情報がありません。');
+    return;
+  }
+  
+  // 空でない名前を保存（B列・C列同じ）
+  const result = await callGasApi('registerUser', {
+    uid: user.uid,
+    name: newName,
+    username: newName,
+    email: user.email
+  });
+  
+  if (result) {
+    // ヘッダーの表示名を更新
+    document.getElementById('user-display-name').innerText = newName;
+    // モーダルを閉じる
+    closeModal('username-modal');
+    // 必要に応じてマイページなどを再読み込み
+    loadMypageData();
+  }
 }
 // メーカー指定で車両一覧を表示する（メーカー一覧クリック時）
 function filterByMaker(makerId, makerName) {
@@ -2367,5 +2420,20 @@ loadAnnouncement(); // ★ 追加
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
   <p><a href="terms.html" style="color: var(--main-color); text-decoration: none;">利用規約 兼 プライバシーポリシー</a></p>
 </footer>
+
+  <!-- ユーザー名設定モーダル -->
+<div id="username-modal" class="modal">
+  <div class="modal-content" style="max-width: 400px; text-align: center;">
+    <h3>表示名を設定してください</h3>
+    <p style="color: #aaa; margin-bottom: 15px;">
+      この名前は注文時の購入者名やサイトヘッダーに表示されます。 ※一度登録すると変更できません。
+    </p>
+    <div class="form-group">
+      <input type="text" id="username-input" placeholder="表示名を入力" 
+             style="width:100%; padding:10px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+    </div>
+    <button class="btn" onclick="saveUsername()" style="width:100%;">保存</button>
+  </div>
+</div>
 </body>
 </html>
