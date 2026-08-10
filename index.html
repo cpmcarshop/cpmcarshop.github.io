@@ -85,25 +85,27 @@
   top: 0;
   right: 0;
   bottom: 0;
-  background: #0a0c1b; /* 背景色は好みで調整 */
+  background: rgba(10, 12, 27, 0.6);  /* ★ 60%透過に変更 */
   z-index: 9999;
-  display: none; /* デフォルト非表示（JSで制御） */
+  display: none;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
 }
-
 #loader-wrapper {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background: #0a0c1b;
-  z-index: 15;
-  overflow: hidden;
+  /* position: absolute; を削除 */
+  /* left, top, right, bottom を削除 */
+  background: transparent;  /* 背景は親に任せる */
+  z-index: 10;
+  overflow: visible;
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 150px;
+  height: 150px;
+  margin: 0 auto;
 }
 
 .loader {
@@ -223,7 +225,24 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+/* ===== ローディングフッターテキスト（前面表示） ===== */
+#loading-footer {
+  position: relative;
+  z-index: 20;          /* ローダーより前面に */
+  margin-top: 30px;
+  font-size: 0.8rem;
+  color: #ddd;          /* 明るく */
+  text-align: center;
+  line-height: 1.8;
+  max-width: 90%;
+  pointer-events: none; /* 必要に応じてクリックを透過 */
+}
 
+#loading-footer .highlight {
+  color: var(--main-color);
+  font-weight: bold;
+}
+    
     /* ===== 追加: カルーセル用スタイル ===== */
     .carousel-container {
       position: relative;
@@ -531,12 +550,12 @@
       <div class="loading">Loading</div>
     </div>
   </div>
-<div style="margin-top: 30px; font-size: 0.8rem; color: #888; text-align: center; line-height: 1.6;">
-    サーバーと通信中...<br>
-    ※いつまでたっても進まない場合はページを再読み込みしてください。<br>
-    PRODUCED BY MPEK Group<br>
-    架空車街はMPEK Groupによって運営されています。
-  </div>
+<div id="loading-footer">
+  <div class="highlight">サーバーと通信中...</div>
+  ※いつまでたっても進まない場合はページを再読み込みしてください。<br>
+  PRODUCED BY MPEK Group<br>
+  架空車街はMPEK Groupによって運営されています。
+</div>
 </div>
 
   <header>
