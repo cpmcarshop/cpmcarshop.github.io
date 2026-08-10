@@ -79,13 +79,17 @@
 
     /* 全局ローディングオーバーレイ UI */
    /* ===== 新ローディングアニメーション ===== */
+/* 既存の #global-loading をこのように置き換え */
 #global-loading {
   position: fixed;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
-  background: rgba(10, 12, 27, 0.8);  /* ★ 60%透過に変更 */
+  /* ★ ベースを半透明＋ぼかしに変更 */
+  background: rgba(10, 12, 27, 0.45);          /* 透明度をやや下げてガラス感を強調 */
+  backdrop-filter: blur(24px) saturate(180%);  /* 背景のぼかしと彩度アップ */
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   z-index: 9999;
   display: none;
   flex-direction: column;
@@ -93,6 +97,44 @@
   align-items: center;
   padding: 20px;
   box-sizing: border-box;
+  overflow: hidden;            /* はみ出た光を隠す */
+}
+
+/* ★ 光沢（シャイン）アニメーション（Liquid Glass の質感） */
+#global-loading::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -30%;
+  width: 160%;
+  height: 160%;
+  background: radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.15) 0%, transparent 60%),
+              radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+              radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  animation: liquidShimmer 8s ease-in-out infinite alternate;
+  z-index: 0;                /* ローダーやテキストの背面に */
+}
+
+@keyframes liquidShimmer {
+  0% {
+    transform: translate(-5%, -5%) scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(8%, 8%) scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* ローダーとフッターを前面に（z-index を上げる） */
+#loader-wrapper {
+  position: relative;
+  z-index: 2;                /* 疑似要素より前面 */
+}
+#loading-footer {
+  position: relative;
+  z-index: 2;
 }
 #loader-wrapper {
   /* position: absolute; を削除 */
