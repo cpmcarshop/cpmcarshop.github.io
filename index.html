@@ -801,6 +801,16 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true) {
       signal
     });
     const result = await res.json();
+
+if (result && result.banned) {
+  let url = '?page=goodbye';
+  if (result.remaining) {
+    url += '&days=' + encodeURIComponent(result.remaining);
+  }
+  window.location.href = url;
+  return null;
+}
+    
     if (!result.success) throw new Error(result.error);
     
     apiCache[cacheKey] = {
