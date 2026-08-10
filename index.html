@@ -802,7 +802,12 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true) {
     });
     const result = await res.json();
 
+// callGasApi 内の BAN 検知部分を修正
 if (result && result.banned) {
+  // ★ キャッシュを全クリア
+  for (let key in apiCache) {
+    delete apiCache[key];
+  }
   let url = '?page=goodbye';
   if (result.remaining) {
     url += '&days=' + encodeURIComponent(result.remaining);
@@ -810,7 +815,6 @@ if (result && result.banned) {
   window.location.href = url;
   return null;
 }
-    
     if (!result.success) throw new Error(result.error);
     
     apiCache[cacheKey] = {
