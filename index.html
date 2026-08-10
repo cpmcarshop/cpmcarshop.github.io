@@ -804,11 +804,9 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true) {
 
 // callGasApi 内の BAN 検知部分を修正
 if (result && result.banned) {
-  // ★ キャッシュを全クリア
-  for (let key in apiCache) {
-    delete apiCache[key];
-  }
-  let url = '?page=goodbye';
+  for (let key in apiCache) { delete apiCache[key]; }
+  // GAS_URL は先頭で定義済み（例: const GAS_URL = "https://script.google.com/.../exec";）
+  let url = GAS_URL + '?page=goodbye';
   if (result.remaining) {
     url += '&days=' + encodeURIComponent(result.remaining);
   }
