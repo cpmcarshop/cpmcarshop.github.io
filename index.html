@@ -697,26 +697,31 @@ getRedirectResult(auth)
   .catch((error) => {
     console.error('リダイレクトエラー:', error);
   });
+    
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     window.currentUser = user;
-    document.getElementById('user-display-name').innerText = user.displayName || user.email;
+    
+    // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
+    document.getElementById('user-display-name').innerText = 'ユーザー名確認中...';
     document.getElementById('auth-btn').innerText = 'ログアウト';
     document.getElementById('mypage-tab').classList.add('is-visible');
     
-    // ★★★ 修正箇所：name と username を常に空文字にする ★★★
+    // ★★★ 2. 常に空文字を送信（Google表示名を絶対に送らない） ★★★
     const userInfo = await callGasApi('registerUser', { 
       uid: user.uid, 
-      name: '',   // ← Google表示名を絶対に送信しない（常に空文字）
-      username: '', // ← メールアドレスから自動生成しない（常に空文字）
+      name: '',   // ← 常に空文字（Google表示名を無視）
+      username: '', // ← 常に空文字（メールアドレスから自動生成しない）
       email: user.email 
     });
     
-    // ★ name が空文字ならモーダル表示
+    // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
     if (userInfo && userInfo.name === '') {
+      // 名前が空 → モーダルを表示（ヘッダーは「ユーザー名確認中...」のまま維持）
       showUsernameModal(user.uid);
+      // 注：モーダルが閉じられるまで「ユーザー名確認中...」が表示され続ける
     } else {
-      // 既に設定済みの名前でヘッダーを更新
+      // 名前が設定済み → その名前を表示
       document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
     }
     
