@@ -697,7 +697,6 @@ getRedirectResult(auth)
   .catch((error) => {
     console.error('リダイレクトエラー:', error);
   });
-
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     window.currentUser = user;
@@ -705,15 +704,15 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('auth-btn').innerText = 'ログアウト';
     document.getElementById('mypage-tab').classList.add('is-visible');
     
-    // ★ ユーザー情報を登録・更新（名前は空文字を許容）
+    // ★★★ 修正箇所：name と username を常に空文字にする ★★★
     const userInfo = await callGasApi('registerUser', { 
       uid: user.uid, 
-      name: user.displayName || '',   // 空文字を渡す（デフォルトを使わない）
-      username: user.email.split('@')[0] || '',
+      name: '',   // ← Google表示名を絶対に送信しない（常に空文字）
+      username: '', // ← メールアドレスから自動生成しない（常に空文字）
       email: user.email 
     });
     
-    // ★ name が空文字ならモーダル表示（「ユーザー」という文字列は判定に使わない）
+    // ★ name が空文字ならモーダル表示
     if (userInfo && userInfo.name === '') {
       showUsernameModal(user.uid);
     } else {
