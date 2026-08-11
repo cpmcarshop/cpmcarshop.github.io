@@ -854,18 +854,19 @@
 
 
   <!-- Firebase モジュール SDK (v10) -->
-  <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut,
-  getRedirectResult   // ← 追加
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { 
+      getAuth, 
+      signInWithPopup, 
+      GoogleAuthProvider, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      onAuthStateChanged, 
+      signOut,
+      getRedirectResult,   // ← 追加
+      EmailAuthProvider    // ★ 追加（パスワード変更で必要）
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     // Firebase 設定
     const firebaseConfig = {
@@ -885,55 +886,56 @@ import {
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
     window.signOut = signOut;
+    window.EmailAuthProvider = EmailAuthProvider; // ★ 追加
 
     // リダイレクト結果の処理
-getRedirectResult(auth)
-  .then((result) => {
-    if (result) closeModal('auth-modal');
-  })
-  .catch((error) => {
-    console.error('リダイレクトエラー:', error);
-  });
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) closeModal('auth-modal');
+      })
+      .catch((error) => {
+        console.error('リダイレクトエラー:', error);
+      });
     
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    window.currentUser = user;
-    
-    // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
-    document.getElementById('user-display-name').innerText = 'ユーザー名確認中...';
-    document.getElementById('auth-btn').innerText = 'ログアウト';
-    document.getElementById('mypage-tab').classList.add('is-visible');
-    
-    // ★★★ 2. 常に空文字を送信（Google表示名を絶対に送らない） ★★★
-    const userInfo = await callGasApi('registerUser', { 
-      uid: user.uid, 
-      name: '',   // ← 常に空文字（Google表示名を無視）
-      username: '', // ← 常に空文字（メールアドレスから自動生成しない）
-      email: user.email 
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        window.currentUser = user;
+        
+        // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
+        document.getElementById('user-display-name').innerText = 'ユーザー名確認中...';
+        document.getElementById('auth-btn').innerText = 'ログアウト';
+        document.getElementById('mypage-tab').classList.add('is-visible');
+        
+        // ★★★ 2. 常に空文字を送信（Google表示名を絶対に送らない） ★★★
+        const userInfo = await callGasApi('registerUser', { 
+          uid: user.uid, 
+          name: '',   // ← 常に空文字（Google表示名を無視）
+          username: '', // ← 常に空文字（メールアドレスから自動生成しない）
+          email: user.email 
+        });
+        
+        // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
+        if (userInfo && userInfo.name === '') {
+          // 名前が空 → モーダルを表示（ヘッダーは「ユーザー名確認中...」のまま維持）
+          showUsernameModal(user.uid);
+          // 注：モーダルが閉じられるまで「ユーザー名確認中...」が表示され続ける
+        } else {
+          // 名前が設定済み → その名前を表示
+          document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
+        }
+        
+        setTimeout(async () => {
+          loadMypageData();
+        }, 500);
+        
+      } else {
+        window.currentUser = null;
+        document.getElementById('user-display-name').innerText = '';
+        document.getElementById('auth-btn').innerText = 'ログイン / 登録';
+        document.getElementById('mypage-tab').classList.remove('is-visible');
+      }
     });
-    
-    // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
-    if (userInfo && userInfo.name === '') {
-      // 名前が空 → モーダルを表示（ヘッダーは「ユーザー名確認中...」のまま維持）
-      showUsernameModal(user.uid);
-      // 注：モーダルが閉じられるまで「ユーザー名確認中...」が表示され続ける
-    } else {
-      // 名前が設定済み → その名前を表示
-      document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
-    }
-    
-    setTimeout(async () => {
-      loadMypageData();
-    }, 500);
-    
-  } else {
-    window.currentUser = null;
-    document.getElementById('user-display-name').innerText = '';
-    document.getElementById('auth-btn').innerText = 'ログイン / 登録';
-    document.getElementById('mypage-tab').classList.remove('is-visible');
-  }
-});
-  </script>
+</script>
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxv9-_xWXwFtD-bY-de5r65KkLI-JSTwLE2ebe98RbAyzWClSvrDxJoo6XD7gs1hS00/exec"; // GASのWebアプリURL
@@ -1112,13 +1114,13 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
 
     // 認証ボタン押下
     document.getElementById('auth-btn').addEventListener('click', () => {
-      if (window.currentUser) {
-        window.signOut(window.firebaseAuth);
-      } else {
-        document.getElementById('auth-modal').style.display = 'flex';
-      }
-    });
-
+  if (window.currentUser) {
+    // ログイン中 → アカウント管理モーダルを開く
+    openAccountManagement();
+  } else {
+    document.getElementById('auth-modal').style.display = 'flex';
+  }
+});
     // Google認証
 
     // メール認証
@@ -1159,6 +1161,95 @@ function handleGoogleAuth() {
     window.createUserWithEmailAndPassword(window.firebaseAuth, email, pass)
       .then(() => closeModal('auth-modal'))
       .catch(e => alert(e.message));
+  }
+}
+
+    function openAccountManagement() {
+  if (!window.currentUser) return;
+  // 現在の表示名をセット
+  const displayName = document.getElementById('user-display-name').innerText;
+  document.getElementById('current-display-name').value = displayName;
+
+  // Googleログインかどうか判定し、パスワード変更エリアを表示/非表示
+  const isGoogle = window.currentUser.providerData.some(p => p.providerId === 'google.com');
+  document.getElementById('password-change-area').style.display = isGoogle ? 'none' : 'block';
+
+  document.getElementById('account-modal').style.display = 'flex';
+}
+
+    async function updateUsername() {
+  const newName = document.getElementById('new-display-name').value.trim();
+  if (!newName) return alert('新しい表示名を入力してください。');
+  if (!window.currentUser) return alert('ログインしていません。');
+
+  const result = await callGasApi('registerUser', {
+    uid: window.currentUser.uid,
+    name: newName,
+    username: newName,   // C列も同じ値に
+    email: window.currentUser.email
+  });
+
+  if (result) {
+    document.getElementById('user-display-name').innerText = newName;
+    document.getElementById('current-display-name').value = newName;
+    document.getElementById('new-display-name').value = '';
+    alert('表示名を更新しました。');
+  } else {
+    alert('更新に失敗しました。');
+  }
+}
+
+    async function changePassword() {
+  const currentPass = document.getElementById('current-password').value;
+  const newPass = document.getElementById('new-password').value;
+  if (!currentPass || !newPass) return alert('両方のパスワードを入力してください。');
+  if (newPass.length < 6) return alert('新しいパスワードは6文字以上にしてください。');
+
+  const user = window.currentUser;
+  if (!user) return alert('ログインしていません。');
+
+  try {
+    // window.EmailAuthProvider が使えるようになった
+    const credential = window.EmailAuthProvider.credential(user.email, currentPass);
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPass);
+    alert('パスワードを変更しました。');
+    document.getElementById('current-password').value = '';
+    document.getElementById('new-password').value = '';
+  } catch (e) {
+    alert('パスワード変更に失敗しました: ' + e.message);
+  }
+}
+
+    async function deleteAccount() {
+  if (!window.currentUser) return;
+  const confirmMsg = 'アカウントを削除しますか？\nこの操作は取り消せません。\n（メーカー情報・車両データも全て削除されます）';
+  if (!confirm(confirmMsg)) return;
+
+  const uid = window.currentUser.uid;
+  try {
+    // GASでスプレッドシートのデータを削除（Maker・Cars等）
+    const result = await callGasApi('deleteUserAccount', { uid: uid });
+    if (!result) throw new Error('サーバー側の削除に失敗しました。');
+
+    // Firebaseのユーザー削除
+    await window.currentUser.delete();
+    alert('アカウントを削除しました。');
+
+    // ログアウト状態にする（ページリロード）
+    window.location.reload();
+  } catch (e) {
+    alert('削除エラー: ' + e.message);
+  }
+}
+
+    function logoutAndClose() {
+  if (confirm('ログアウトしますか？')) {
+    window.signOut(window.firebaseAuth).then(() => {
+      closeModal('account-modal');
+      // 必要に応じてページリロード
+      window.location.reload();
+    });
   }
 }
 // ホームタブ読み込み（初期表示用）
@@ -2651,6 +2742,49 @@ loadAnnouncement(); // ★ 追加
              style="width:100%; padding:10px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
     </div>
     <button class="btn" onclick="saveUsername()" style="width:100%;">保存</button>
+  </div>
+</div>
+
+  <!-- ★★★ アカウント管理モーダル ★★★ -->
+<div id="account-modal" class="modal">
+  <div class="modal-content" style="max-width: 450px;">
+    <h3>🔐 アカウント管理</h3>
+    
+    <!-- ユーザー名変更 -->
+    <div class="form-group">
+      <label>現在の表示名</label>
+      <input type="text" id="current-display-name" readonly style="background:#333; color:#aaa;">
+    </div>
+    <div class="form-group">
+      <label>新しい表示名</label>
+      <input type="text" id="new-display-name" placeholder="新しい名前を入力">
+    </div>
+    <button class="btn" onclick="updateUsername()" style="width:100%; margin-bottom:10px;">表示名を変更</button>
+
+    <hr style="border-color:#333;">
+
+    <!-- パスワード変更（Googleログイン時は非表示） -->
+    <div id="password-change-area">
+      <div class="form-group">
+        <label>現在のパスワード</label>
+        <input type="password" id="current-password" placeholder="現在のパスワード">
+      </div>
+      <div class="form-group">
+        <label>新しいパスワード</label>
+        <input type="password" id="new-password" placeholder="新しいパスワード（6文字以上）">
+      </div>
+      <button class="btn" onclick="changePassword()" style="width:100%; margin-bottom:10px;">パスワードを変更</button>
+    </div>
+
+    <hr style="border-color:#333;">
+
+    <!-- アカウント削除 -->
+    <button class="btn btn-danger" onclick="deleteAccount()" style="width:100%; margin-bottom:10px;">🗑 アカウントを削除</button>
+
+    <!-- ログアウト -->
+    <button class="btn btn-secondary" onclick="logoutAndClose()" style="width:100%; margin-bottom:10px;">🚪 ログアウト</button>
+
+    <button class="btn btn-secondary" onclick="closeModal('account-modal')" style="width:100%;">閉じる</button>
   </div>
 </div>
 </body>
