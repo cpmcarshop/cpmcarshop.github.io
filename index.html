@@ -852,8 +852,7 @@
 
   <!-- ★★★ 追加: セール編集モーダル ★★★ -->
 
-
-  <!-- Firebase モジュール SDK (v10) -->
+<!-- Firebase モジュール SDK (v10) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { 
@@ -864,8 +863,10 @@
       createUserWithEmailAndPassword, 
       onAuthStateChanged, 
       signOut,
-      getRedirectResult,   // ← 追加
-      EmailAuthProvider    // ★ 追加（パスワード変更で必要）
+      getRedirectResult,
+      EmailAuthProvider,
+      reauthenticateWithCredential,   // ★ 追加
+      updatePassword                  // ★ 追加
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     // Firebase 設定
@@ -886,7 +887,9 @@
     window.signInWithEmailAndPassword = signInWithEmailAndPassword;
     window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
     window.signOut = signOut;
-    window.EmailAuthProvider = EmailAuthProvider; // ★ 追加
+    window.EmailAuthProvider = EmailAuthProvider;
+    window.reauthenticateWithCredential = reauthenticateWithCredential;   // ★ 追加
+    window.updatePassword = updatePassword;                               // ★ 追加
 
     // リダイレクト結果の処理
     getRedirectResult(auth)
@@ -903,7 +906,7 @@
         
         // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
         document.getElementById('user-display-name').innerText = 'ユーザー名確認中...';
-        document.getElementById('auth-btn').innerText = '管理'
+        document.getElementById('auth-btn').innerText = '管理';
         document.getElementById('mypage-tab').classList.add('is-visible');
         
         // ★★★ 2. 常に空文字を送信（Google表示名を絶対に送らない） ★★★
@@ -1199,7 +1202,7 @@ function handleGoogleAuth() {
   }
 }
 
-    async function changePassword() {
+ async function changePassword() {
   const currentPass = document.getElementById('current-password').value;
   const newPass = document.getElementById('new-password').value;
   if (!currentPass || !newPass) return alert('両方のパスワードを入力してください。');
@@ -1209,10 +1212,12 @@ function handleGoogleAuth() {
   if (!user) return alert('ログインしていません。');
 
   try {
-    // window.EmailAuthProvider が使えるようになった
+    // ★ 再認証用のクレデンシャルを作成
     const credential = window.EmailAuthProvider.credential(user.email, currentPass);
-    await user.reauthenticateWithCredential(credential);
-    await user.updatePassword(newPass);
+    // ★ 再認証（関数として呼び出し）
+    await window.reauthenticateWithCredential(user, credential);
+    // ★ パスワード更新（関数として呼び出し）
+    await window.updatePassword(user, newPass);
     alert('パスワードを変更しました。');
     document.getElementById('current-password').value = '';
     document.getElementById('new-password').value = '';
