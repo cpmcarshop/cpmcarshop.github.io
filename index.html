@@ -630,19 +630,27 @@
   <div class="container">
     <!-- 1. ホームタブ -->
     <!-- ★ ここから追加（自由記述スペース） -->
-<div id="custom-home-header" style="margin-bottom: 20px;">
-  <h1 style="font-size: 2.2rem; margin: 0 0 5px 0;">架空車街へようこそ！</h1>
-  <p style="font-size: 1.8rem; margin: 0 0 10px 0; color: var(--main-color);">
-    現在 <span id="total-car-count">0</span> 台が掲載されています。
-  </p>
-  
-  <!-- ★★★ ここに好きな文章を直書きしてください ★★★ -->
-  <div id="free-text-area" style="font-size: 1rem; color: #ccc;">
-    <!-- 例：ここにイベント告知や注意書きを自由に書いてください -->
-    <p>架空車の販売情報がすぐわかる！<br>
-    購入までの流れもスムーズ！</p>
+<!-- 1. ホームタブ -->
+<main id="home" class="tab-content active">  <!-- ← この行を追加 -->
+  <!-- ★ ここから追加（自由記述スペース） -->
+  <div id="custom-home-header" style="margin-bottom: 20px;">
+    <h1 style="font-size: 2.2rem; margin: 0 0 5px 0;">架空車街へようこそ！</h1>
+    <p style="font-size: 1.8rem; margin: 0 0 10px 0; color: var(--main-color);">
+      現在 <span id="total-car-count">0</span> 台が掲載されています。
+    </p>
+    <div id="free-text-area" style="font-size: 1rem; color: #ccc;">
+      <p>架空車の販売情報がすぐわかる！<br>購入までの流れもスムーズ！</p>
+    </div>
+    <hr style="border-color: #333; margin: 20px 0;">
   </div>
-  <!-- ここまで自由記述エリア -->
+  <!-- ★ ここまで追加 -->
+
+  <h2>注目の架空車</h2>
+  <div id="home-car-grid" class="card-grid"></div>
+</main>  <!-- ← この行を追加（閉じタグ） -->
+
+<!-- 2. 車両検索タブ -->
+<main id="search" class="tab-content">
 
   <hr style="border-color: #333; margin: 20px 0;">
 </div>
