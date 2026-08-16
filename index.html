@@ -1336,27 +1336,65 @@ async function saveTwitterId() {
 }
 
     async function deleteAccount() {
-  if (!window.currentUser) return;
-  const confirmMsg = 'アカウントを削除しますか？\nこの操作は取り消せません。\n（メーカー情報・車両データも全て削除されます）';
-  if (!confirm(confirmMsg)) return;
+  if (!window.currentUser) {
+    alert('ログインしていません。');
+    return;
+  }
 
-  const uid = window.currentUser.uid;
+  const user = window.currentUser;
+  const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
+
   try {
-    // GASでスプレッドシートのデータを削除（Maker・Cars等）
-    const result = await callGasApi('deleteUserAccount', { uid: uid });
+    // ---- 再認証 ----
+    if (isGoogle) {
+      // Googleアカウント: ポップアップで再認証
+      const provider = new window.GoogleAuthProvider();
+      await window.signInWithPopup(window.firebaseAuth, provider);
+      // 再認証成功（ポップアップが閉じると続行）
+    } else {
+      // メールアカウント: パスワード入力
+      const password = prompt('セキュリティ確認のため、現在のパスワードを入力してください：');
+      if (password === null) return; // キャンセル
+      if (!password) {
+        alert('パスワードを入力してください。');
+        return;
+      }
+      const credential = window.EmailAuthProvider.credential(user.email, password);
+      await window.reauthenticateWithCredential(user, credential);
+    }
+
+    // ---- 再認証成功 → 削除確認 ----
+    const confirmMsg = 'アカウントを削除しますか？\nこの操作は取り消せません。\n（メーカー情報・車両データも全て削除されます）';
+    if (!confirm(confirmMsg)) return;
+
+    // GASでスプレッドシートのデータを削除
+    const result = await callGasApi('deleteUserAccount', { uid: user.uid });
     if (!result) throw new Error('サーバー側の削除に失敗しました。');
 
     // Firebaseのユーザー削除
-    await window.currentUser.delete();
+    await user.delete();
     alert('アカウントを削除しました。');
-
-    // ログアウト状態にする（ページリロード）
     window.location.reload();
+
   } catch (e) {
-    alert('削除エラー: ' + e.message);
+    console.error('削除エラー:', e);
+    // エラーメッセージをユーザーにわかりやすく表示
+    if (e.code === 'auth/wrong-password') {
+      alert('パスワードが間違っています。');
+    } else if (e.code === 'auth/too-many-requests') {
+      alert('試行回数が多すぎます。しばらく待ってから再試行してください。');
+    } else if (e.code === 'auth/popup-closed-by-user') {
+      alert('再認証ポップアップが閉じられました。もう一度お試しください。');
+    } else if (e.code === 'auth/popup-blocked') {
+      alert('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。');
+    } else if (e.code === 'auth/requires-recent-login') {
+      // 再認証に失敗した場合（まれに発生）
+      alert('再認証に失敗しました。一度ログアウトして再度ログインし、もう一度お試しください。');
+    } else {
+      alert('削除エラー: ' + (e.message || '不明なエラー'));
+    }
   }
 }
-
     function logoutAndClose() {
   if (confirm('ログアウトしますか？')) {
     window.signOut(window.firebaseAuth).then(() => {
