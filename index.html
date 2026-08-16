@@ -941,12 +941,14 @@ if (userInfo && userInfo.name === '') {
 }
 
 // ★★★ TwitterID チェック（追加） ★★★
-const twitterId = userInfo.twitterId || '';
-if (!twitterId) {
-  // TwitterID が未設定ならモーダル表示
-  showTwitterModal();
+// ★★★ TwitterID チェック（修正） ★★★
+const twitterId = userInfo && userInfo.twitterId ? userInfo.twitterId : '';
+if (!twitterId || twitterId === '') {
+  // 既にモーダルが表示されていなければ表示
+  if (document.getElementById('twitter-modal').style.display !== 'flex') {
+    showTwitterModal();
+  }
 } else {
-  // 保存しておく
   window.currentUser.twitterId = twitterId;
 }
         
@@ -1192,24 +1194,28 @@ function handleGoogleAuth() {
 
     function openAccountManagement() {
   if (!window.currentUser) return;
-  // 現在の表示名をセット
   const displayName = document.getElementById('user-display-name').innerText;
   document.getElementById('current-display-name').value = displayName;
-
-  // Googleログインかどうか判定し、パスワード変更エリアを表示/非表示
+  
+  // ★★★ TwitterID を表示（追加） ★★★
+  const twitterId = window.currentUser.twitterId || '';
+  document.getElementById('current-twitter-id').value = twitterId || '未設定';
+  document.getElementById('new-twitter-id').value = '';
+  
   const isGoogle = window.currentUser.providerData.some(p => p.providerId === 'google.com');
   document.getElementById('password-change-area').style.display = isGoogle ? 'none' : 'block';
-
   document.getElementById('account-modal').style.display = 'flex';
 }
 
-    async function saveTwitterId() {
-  const twitterId = document.getElementById('twitter-input').value.trim();
+    /**
+ * アカウント管理モーダルから TwitterID を更新
+ */
+async function updateTwitterId() {
+  const twitterId = document.getElementById('new-twitter-id').value.trim();
   if (!twitterId) {
     alert('Twitter ID を入力してください。');
     return;
   }
-  // @ が含まれていたら除去
   const cleanId = twitterId.replace(/^[@＠]+/, '');
   if (!cleanId) {
     alert('有効な ID を入力してください。');
@@ -1227,14 +1233,47 @@ function handleGoogleAuth() {
   });
 
   if (result) {
-    // 保存成功 → ユーザー情報に反映
     window.currentUser.twitterId = cleanId;
-    // モーダルを閉じる
-    closeModal('twitter-modal');
-    // 必要に応じてリロード
-    showToast('✅ Twitter ID を登録しました');
+    document.getElementById('current-twitter-id').value = cleanId;
+    document.getElementById('new-twitter-id').value = '';
+    showToast('✅ Twitter ID を更新しました');
   } else {
-    alert('登録に失敗しました。');
+    alert('更新に失敗しました。');
+  }
+}
+async function saveTwitterId() {
+  const twitterId = document.getElementById('twitter-input').value.trim();
+  if (!twitterId) {
+    alert('Twitter ID を入力してください。');
+    return;
+  }
+  const cleanId = twitterId.replace(/^[@＠]+/, '');
+  if (!cleanId) {
+    alert('有効な ID を入力してください。');
+    return;
+  }
+  const user = window.currentUser;
+  if (!user) {
+    alert('ログイン情報がありません。');
+    return;
+  }
+
+  try {
+    const result = await callGasApi('updateUserTwitterId', {
+      uid: user.uid,
+      twitterId: cleanId
+    });
+
+    if (result && result.message) {
+      window.currentUser.twitterId = cleanId;
+      closeModal('twitter-modal');
+      showToast('✅ Twitter ID を登録しました');
+    } else {
+      alert('登録に失敗しました。' + (result?.error || ''));
+    }
+  } catch (e) {
+    console.error('TwitterID登録エラー:', e);
+    alert('通信エラーが発生しました。もう一度お試しください。');
   }
 }
     function showTwitterModal() {
@@ -2148,7 +2187,7 @@ function updateUserTwitterId(uid, twitterId) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === uid) {
-      sheet.getRange(i + 1, 5).setValue(twitterId);
+      sheet.getRange(i + 1, 7).setValue(twitterId); // ← 7列目（G列）に変更
       return { message: "TwitterIDを更新しました", twitterId: twitterId };
     }
   }
@@ -2877,6 +2916,18 @@ loadAnnouncement(); // ★ 追加
     <button class="btn" onclick="updateUsername()" style="width:100%; margin-bottom:10px;">表示名を変更</button>
 
     <hr style="border-color:#333;">
+    <!-- ★★★ TwitterID 変更（追加） ★★★ -->
+<div class="form-group">
+  <label>現在の Twitter ID</label>
+  <input type="text" id="current-twitter-id" readonly style="background:#333; color:#aaa;">
+</div>
+<div class="form-group">
+  <label>新しい Twitter ID</label>
+  <input type="text" id="new-twitter-id" placeholder="@ なしで入力">
+</div>
+<button class="btn" onclick="updateTwitterId()" style="width:100%; margin-bottom:10px;">Twitter ID を更新</button>
+
+<hr style="border-color:#333;">
 
     <!-- パスワード変更（Googleログイン時は非表示） -->
     <div id="password-change-area">
