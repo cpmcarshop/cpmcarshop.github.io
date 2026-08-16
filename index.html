@@ -933,14 +933,22 @@
         });
         
         // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
-        if (userInfo && userInfo.name === '') {
-          // 名前が空 → モーダルを表示（ヘッダーは「ユーザー名確認中...」のまま維持）
-          showUsernameModal(user.uid);
-          // 注：モーダルが閉じられるまで「ユーザー名確認中...」が表示され続ける
-        } else {
-          // 名前が設定済み → その名前を表示
-          document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
-        }
+       // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
+if (userInfo && userInfo.name === '') {
+  showUsernameModal(user.uid);
+} else {
+  document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
+}
+
+// ★★★ TwitterID チェック（追加） ★★★
+const twitterId = userInfo.twitterId || '';
+if (!twitterId) {
+  // TwitterID が未設定ならモーダル表示
+  showTwitterModal();
+} else {
+  // 保存しておく
+  window.currentUser.twitterId = twitterId;
+}
         
         setTimeout(async () => {
           loadMypageData();
@@ -1193,6 +1201,53 @@ function handleGoogleAuth() {
   document.getElementById('password-change-area').style.display = isGoogle ? 'none' : 'block';
 
   document.getElementById('account-modal').style.display = 'flex';
+}
+
+    async function saveTwitterId() {
+  const twitterId = document.getElementById('twitter-input').value.trim();
+  if (!twitterId) {
+    alert('Twitter ID を入力してください。');
+    return;
+  }
+  // @ が含まれていたら除去
+  const cleanId = twitterId.replace(/^[@＠]+/, '');
+  if (!cleanId) {
+    alert('有効な ID を入力してください。');
+    return;
+  }
+  const user = window.currentUser;
+  if (!user) {
+    alert('ログイン情報がありません。');
+    return;
+  }
+
+  const result = await callGasApi('updateUserTwitterId', {
+    uid: user.uid,
+    twitterId: cleanId
+  });
+
+  if (result) {
+    // 保存成功 → ユーザー情報に反映
+    window.currentUser.twitterId = cleanId;
+    // モーダルを閉じる
+    closeModal('twitter-modal');
+    // 必要に応じてリロード
+    showToast('✅ Twitter ID を登録しました');
+  } else {
+    alert('登録に失敗しました。');
+  }
+}
+    function showTwitterModal() {
+  const modal = document.getElementById('twitter-modal');
+  modal.style.display = 'flex';
+  // 背景クリックで閉じないように
+  modal.onclick = function(e) {
+    if (e.target === modal) {
+      // 何もしない（閉じない）
+    }
+  };
+  document.getElementById('twitter-input').value = '';
+  setTimeout(() => document.getElementById('twitter-input').focus(), 100);
 }
 
     async function updateUsername() {
@@ -2012,10 +2067,11 @@ async function executePurchase() {
   if (currentCarDetail.contactType === 'twitter') {
     const orderRes = await callGasApi('createOrder', {
       carId: currentCarDetail.carId,
-      makerId: currentCarDetail.makerId,
-      makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-      buyerUid: window.currentUser.uid,
-      buyerName: window.currentUser.displayName || window.currentUser.email,
+  makerId: currentCarDetail.makerId,
+  makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+  buyerUid: window.currentUser.uid,
+  buyerName: document.getElementById('user-display-name').innerText || window.currentUser.email,
+  buyerTwitterId: window.currentUser.twitterId || '',  // ★ 追加
       gradeName: grade,
       colorName: color,
       options: options,
@@ -2054,7 +2110,8 @@ async function executePurchase() {
     makerId: currentCarDetail.makerId,
     makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
     buyerUid: window.currentUser.uid,
-    buyerName: window.currentUser.displayName || window.currentUser.email,
+    buyerName: document.getElementById('user-display-name').innerText || window.currentUser.email,
+    buyerTwitterId: window.currentUser.twitterId || '',
     gradeName: grade,
     colorName: color,
     options: options,
@@ -2069,6 +2126,35 @@ async function executePurchase() {
   }
 }
 
+/**
+ * ユーザーのTwitterIDを取得
+ */
+function getUserTwitterId(uid) {
+  const sheet = getSheet('Users');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === uid) {
+      return data[i][4] || ''; // 5列目（インデックス4）
+    }
+  }
+  return null;
+}
+
+/**
+ * ユーザーのTwitterIDを更新（フロントから呼ばれる）
+ */
+function updateUserTwitterId(uid, twitterId) {
+  const sheet = getSheet('Users');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === uid) {
+      sheet.getRange(i + 1, 5).setValue(twitterId);
+      return { message: "TwitterIDを更新しました", twitterId: twitterId };
+    }
+  }
+  throw new Error("ユーザーが見つかりません");
+}
+    
     async function deleteCar(carId) {
       if (!confirm("この車両を削除してもよろしいですか？")) return;
       const res = await callGasApi('deleteCar', { carId: carId });
@@ -2175,7 +2261,7 @@ statusArea.innerHTML = `
   if (orderRes && orderRes.orders.length > 0) {
    orderList.innerHTML = orderRes.orders.map(o => `
   <div class="notif-box">
-    <strong>【注文】${o.buyerName} 様</strong> - ${o.createdAt}<br>
+    <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
     グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${o.options.join(', ') || 'なし'}<br>
     合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
     ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
@@ -2814,6 +2900,22 @@ loadAnnouncement(); // ★ 追加
     <button class="btn btn-secondary" onclick="logoutAndClose()" style="width:100%; margin-bottom:10px;">🚪 ログアウト</button>
 
     <button class="btn btn-secondary" onclick="closeModal('account-modal')" style="width:100%;">閉じる</button>
+  </div>
+</div>
+
+  <!-- ★★★ TwitterID 設定モーダル ★★★ -->
+<div id="twitter-modal" class="modal">
+  <div class="modal-content" style="max-width: 400px; text-align: center;">
+    <h3>Twitter(X) ID を設定してください</h3>
+    <p style="color: #aaa; margin-bottom: 15px;">
+      注文時の連絡や表示に使用されます。<br>
+      ※ @ は含めず、ID のみを入力してください。
+    </p>
+    <div class="form-group">
+      <input type="text" id="twitter-input" placeholder="Twitter ID（例: your_id）" 
+             style="width:100%; padding:10px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px;">
+    </div>
+    <button class="btn" onclick="saveTwitterId()" style="width:100%;">保存</button>
   </div>
 </div>
 </body>
