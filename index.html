@@ -2292,19 +2292,12 @@ statusArea.innerHTML = `
     </div>
   `;
 
-  statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
-  // options が配列かどうかチェックし、配列でなければ空配列として扱う
-const optionsArray = Array.isArray(o.options) ? o.options : [];
-const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
-
-  // 注文・通知一覧（既存）
-  // 注文・通知一覧（既存）// 注文・通知一覧（既存）
+  statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);// 注文・通知一覧（既存）
 const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
 const orderList = document.getElementById('orders-notification-list');
 if (orderRes && orderRes.orders.length > 0) {
-  // ★★★ 修正：map のコールバック内で options を安全に処理 ★★★
   orderList.innerHTML = orderRes.orders.map(o => {
-    // ★ ここで o が定義されているので安全！
+    // ★★★★★ ここで o が定義されているので安全 ★★★★★
     const optionsArray = Array.isArray(o.options) ? o.options : [];
     const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
 
@@ -2321,7 +2314,6 @@ if (orderRes && orderRes.orders.length > 0) {
 } else {
   orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
 }
-
   // 自社車両（既存）
   renderCarGrid('my-cars-grid', myCars || [], true);
 
