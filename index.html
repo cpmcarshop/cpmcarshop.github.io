@@ -2298,15 +2298,22 @@ statusArea.innerHTML = `
   const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
   const orderList = document.getElementById('orders-notification-list');
   if (orderRes && orderRes.orders.length > 0) {
-   orderList.innerHTML = orderRes.orders.map(o => `
-  <div class="notif-box">
-    <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
-    グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${o.options.join(', ') || 'なし'}<br>
-    合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
-    ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
-    ${o.status === '納車完了' ? `<br><button class="btn btn-danger" style="margin-top:5px;" onclick="deleteOrder('${o.orderId}')">🗑 削除</button>` : ''}
-  </div>
-`).join('');
+   // 注文一覧表示部分
+orderList.innerHTML = orderRes.orders.map(o => {
+  // ★ ここで安全に options を配列化
+  const optionsArray = Array.isArray(o.options) ? o.options : [];
+  const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
+
+  return `
+    <div class="notif-box">
+      <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
+      グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
+      合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
+      ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
+      ${o.status === '納車完了' ? `<br><button class="btn btn-danger" style="margin-top:5px;" onclick="deleteOrder('${o.orderId}')">🗑 削除</button>` : ''}
+    </div>
+  `;
+}).join('');
   } else {
     orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
   }
