@@ -1,0 +1,21 @@
+{
+  "name": "架空車街",
+  "short_name": "架空車街",
+  "description": "カーパーキングの架空車販売ポータル",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0c1b",
+  "theme_color": "#00d2ff",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
