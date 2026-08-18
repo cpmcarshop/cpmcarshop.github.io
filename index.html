@@ -666,7 +666,7 @@
     
     <!-- ★ ここから：まとめボタン（ドロップダウン） -->
     <div class="header-dropdown" style="display: inline-block; position: relative; margin-right: 5px;">
-      <button class="btn btn-secondary" onclick="toggleSupportMenu(event)">サポート🔽</button>
+      <button class="btn btn-secondary" onclick="toggleSupportMenu(event)">案内🔽</button>
       <div id="support-menu" class="dropdown-menu">
         <button onclick="openContact(); closeSupportMenu();">お問い合わせ</button>
         <button onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank'); closeSupportMenu();">掲示板</button>
@@ -983,7 +983,7 @@
         window.currentUser = user;
         
         // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
-        document.getElementById('user-display-name').innerText = 'ユーザー名確認中...';
+        document.getElementById('user-display-name').innerText = '認証中...';
         document.getElementById('auth-btn').innerText = '管理';
         document.getElementById('mypage-tab').classList.add('is-visible');
         
