@@ -567,6 +567,22 @@
     flex-basis: 100%;
   }
 }
+
+    /* ヘッダーサブロゴ用のスタイル */
+    header h1 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-sub-logo {
+      display: inline-block;
+      font-size: 0.4rem;
+      line-height: 1.1;
+      color: var(--main-color);
+      vertical-align: middle;
+      font-weight: normal;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -603,13 +619,17 @@
 
   <header>
   <div style="display: flex; align-items: center;">
-    <h1>架空車街 <span style="font-size: 0.45em; color: var(--main-color);">PRODUCED BY<br>MPEK Group</span></h1>
+    <h1 style="line-height: 1.2;">
+      架空車街
+      <span class="header-sub-logo">
+        PRODUCED BY<br>MPEK Group
+      </span>
+    </h1>
     <div id="announcement-pc" class="announcement"></div>
   </div>
   <div>
     <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
     <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">ヘルプ</button>
-    <!-- ★ 追加：掲示板に行くボタン -->
     <button class="btn btn-secondary" onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank')" style="margin-right: 5px;">掲示板</button>
     <button class="btn" id="auth-btn">ログイン / 登録</button>
   </div>
