@@ -584,6 +584,39 @@
       font-family: inherit; /* ★ 親要素(h1)のフォントの種類を引き継ぐ */
       letter-spacing: 0.5px;
     }
+    /* サポートメニュー（ドロップダウン）のスタイル */
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 5px;
+      background: var(--card-bg);
+      border: 1px solid var(--main-color);
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      z-index: 100;
+      min-width: 160px;
+      overflow: hidden;
+    }
+    .dropdown-menu.show {
+      display: block;
+    }
+    .dropdown-menu button {
+      width: 100%;
+      padding: 10px 15px;
+      background: none;
+      border: none;
+      color: #fff;
+      text-align: left;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .dropdown-menu button:hover {
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--main-color);
+    }
   </style>
 </head>
 <body>
@@ -630,8 +663,17 @@
   </div>
   <div>
     <span id="user-display-name" style="margin-right: 10px; font-size: 0.9rem;"></span>
-    <button class="btn btn-secondary" onclick="openContact()" style="margin-right: 5px;">ヘルプ</button>
-    <button class="btn btn-secondary" onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank')" style="margin-right: 5px;">掲示板</button>
+    
+    <!-- ★ ここから：まとめボタン（ドロップダウン） -->
+    <div class="header-dropdown" style="display: inline-block; position: relative; margin-right: 5px;">
+      <button class="btn btn-secondary" onclick="toggleSupportMenu(event)">サポート🔽</button>
+      <div id="support-menu" class="dropdown-menu">
+        <button onclick="openContact(); closeSupportMenu();">お問い合わせ</button>
+        <button onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank'); closeSupportMenu();">掲示板</button>
+      </div>
+    </div>
+    <!-- ★ ここまで -->
+
     <button class="btn" id="auth-btn">ログイン / 登録</button>
   </div>
 </header>
@@ -2911,6 +2953,23 @@ function addGradeForm(data = {}) {
       }
     }
 
+// サポートメニューの開閉処理
+    function toggleSupportMenu(event) {
+      event.stopPropagation();
+      const menu = document.getElementById('support-menu');
+      menu.classList.toggle('show');
+    }
+
+    function closeSupportMenu() {
+      const menu = document.getElementById('support-menu');
+      if (menu) menu.classList.remove('show');
+    }
+
+    // メニュー外をクリックしたら閉じる
+    window.addEventListener('click', function() {
+      closeSupportMenu();
+    });
+    
 function checkUrlForCar() {
   const params = new URLSearchParams(window.location.search);
   const carId = params.get('car');
