@@ -576,11 +576,12 @@
     }
     .header-sub-logo {
       display: inline-block;
-      font-size: 0.4rem;
+      font-size: 0.75rem; /* お好みの大きさに調整してください */
       line-height: 1.1;
       color: var(--main-color);
       vertical-align: middle;
-      font-weight: normal;
+      font-weight: inherit; /* ★ 親要素(h1)の太さ・フォントを引き継ぐ */
+      font-family: inherit; /* ★ 親要素(h1)のフォントの種類を引き継ぐ */
       letter-spacing: 0.5px;
     }
   </style>
