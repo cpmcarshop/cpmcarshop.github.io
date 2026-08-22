@@ -1032,7 +1032,14 @@ if (!twitterId || twitterId === '') {
 // ユーザー名設定モーダルやTwitter IDモーダルが表示されている場合は、それらが閉じられた後に表示するため、
 // 少し遅延して実行（モーダルが閉じるのを待つ）
 // ★★★ お知らせチェック（修正版：確実に両方のモーダルが閉じるのを待つ） ★★★
+// ★★★ お知らせチェック（修正版：確実に両方のモーダルが閉じるのを待つ） ★★★
 setTimeout(() => {
+  // ★ 既存のインターバルをクリア（多重起動防止）
+  if (announcementCheckInterval) {
+    clearInterval(announcementCheckInterval);
+    announcementCheckInterval = null;
+  }
+  
   const usernameModal = document.getElementById('username-modal');
   const twitterModal = document.getElementById('twitter-modal');
 
@@ -1042,10 +1049,11 @@ setTimeout(() => {
     return;
   }
 
-  // どちらかが開いている場合は、両方閉じるまでポーリング（0.3秒間隔）
-  const checkInterval = setInterval(() => {
+  // どちらかが開いている場合は、両方閉じるまでポーリング
+  announcementCheckInterval = setInterval(() => {
     if (usernameModal.style.display !== 'flex' && twitterModal.style.display !== 'flex') {
-      clearInterval(checkInterval);
+      clearInterval(announcementCheckInterval);
+      announcementCheckInterval = null;
       fetchAndShowAnnouncements(user.uid);
     }
   }, 300);
@@ -1107,53 +1115,85 @@ function addRwParam(url) {
     return url + '=rw';
   }
 }
-
-    // ===== お知らせ関連 =====
-let announcementQueue = []; // 未読お知らせのキュー
+// ===== お知らせ関連 =====
+let announcementQueue = [];
 let currentAnnouncementIndex = 0;
+let announcementCheckInterval = null; // ★ 追加: インターバルIDを保持
 
 /**
  * ユーザーの未読お知らせを取得し、表示を開始
  */
 async function fetchAndShowAnnouncements(uid) {
-  if (!uid) return;
-  const anns = await callGasApi('getUserAnnouncements', { uid: uid });
-  if (!anns || anns.length === 0) return;
-  announcementQueue = anns;
-  currentAnnouncementIndex = 0;
-  showNextAnnouncement();
+  if (!uid) {
+    console.warn('⚠️ uidがありません');
+    return;
+  }
+  
+  console.log('📢 fetchAndShowAnnouncements 開始: uid=' + uid);
+  
+  try {
+    const anns = await callGasApi('getUserAnnouncements', { uid: uid }, false);
+    console.log('📦 サーバーからの返却:', anns);
+    
+    if (!anns || anns.length === 0) {
+      console.log('ℹ️ 未読のお知らせはありません');
+      return;
+    }
+    
+    announcementQueue = anns;
+    currentAnnouncementIndex = 0;
+    console.log('🔄 お知らせキューセット完了, 件数=' + anns.length);
+    showNextAnnouncement();
+  } catch (e) {
+    console.error('❌ お知らせ取得エラー:', e);
+  }
 }
 
 function showNextAnnouncement() {
   if (currentAnnouncementIndex >= announcementQueue.length) {
-    // すべて表示済み
+    console.log('📢 すべてのお知らせを表示しました');
     return;
   }
+  
   const ann = announcementQueue[currentAnnouncementIndex];
+  console.log('📢 表示中: ' + ann.title);
+  
   document.getElementById('announcement-title').innerText = '📢 ' + ann.title;
-  // content内のURLをリンク化（単純な正規表現）
+  
+  // content内のURLをリンク化
   const contentWithLinks = ann.content.replace(
     /(https?:\/\/[^\s]+)/g,
     '<a href="$1" target="_blank" rel="noopener" style="color:var(--main-color);text-decoration:underline;">$1</a>'
   );
   document.getElementById('announcement-body').innerHTML = contentWithLinks;
-  // OKボタンのイベントを設定
+  
+  // OKボタンのイベントを設定（既存のイベントをクリア）
   const okBtn = document.getElementById('announcement-ok-btn');
-  // 既存のイベントを削除して新規設定
   const newOkBtn = okBtn.cloneNode(true);
   okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+  
   newOkBtn.addEventListener('click', function() {
-    // 既読にする
-    callGasApi('markAnnouncementRead', { uid: window.currentUser.uid, announcementId: ann.announcementId }, false);
+    console.log('✅ お知らせ既読: ' + ann.announcementId);
+    // 既読にする（ローディング表示なし）
+    callGasApi('markAnnouncementRead', { 
+      uid: window.currentUser.uid, 
+      announcementId: ann.announcementId 
+    }, false).then(() => {
+      console.log('✅ 既読記録完了');
+    }).catch(e => {
+      console.error('❌ 既読記録エラー:', e);
+    });
+    
     // 次のお知らせへ
     currentAnnouncementIndex++;
     if (currentAnnouncementIndex < announcementQueue.length) {
       showNextAnnouncement();
     } else {
       closeModal('announcement-modal');
-      // すべて表示し終わったら admin パネルがあれば閉じるなど
+      console.log('📢 全てのお知らせを表示完了');
     }
   });
+  
   // モーダルを表示
   document.getElementById('announcement-modal').style.display = 'flex';
 }
