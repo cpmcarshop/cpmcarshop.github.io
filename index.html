@@ -1375,24 +1375,31 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
     }
 
     // タブ切替
-   function switchTab(tabId) {
+   async function switchTab(tabId) {
+  // タブのアクティブ化処理（共通部分）はそのまま
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
-  
   const tabBtn = document.getElementById('tab-btn-' + tabId) || (tabId === 'mypage' ? document.getElementById('mypage-tab') : null);
   if (tabBtn) tabBtn.classList.add('active');
 
-  // ★ ホームタブはキャッシュがあれば即表示、なければロード ★
+  // ★ ホームタブの場合
   if (tabId === 'home') {
-  const cacheKey = 'getCars{"sortBy":"view"}';  // ← loadHomeCarsと同じキーに
-  const cached = apiCache[cacheKey];
+    const cacheKey = 'getCars{"sortBy":"view"}';
+    const cached = apiCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      renderCarGrid('home-car-grid', cached.data);
-      return; // キャッシュがあればAPI呼び出ししない
+      // ★ キャッシュのデータにアイコンを付与してから表示
+      const enrichedCached = await enrichCarsWithMakerIcons(cached.data);
+      renderCarGrid('home-car-grid', enrichedCached);
+      return;
     }
-    loadHomeCars();
-  } else if (tabId === 'search') {
+    // キャッシュがなければ読み込み
+    await loadHomeCars();
+    return;
+  }
+
+  // その他タブは従来通り
+  if (tabId === 'search') {
     executeSearch();
   } else if (tabId === 'makers') {
     loadMakers();
@@ -1402,7 +1409,6 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
     loadMypageData();
   }
 }
-
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     // 認証ボタン押下
