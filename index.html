@@ -2777,493 +2777,522 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
-      // ============================================================
-  // 画像エディタ（トリミング・回転）
-  // ============================================================
-  let editorImage = null;
-  let editorCanvas = null;
-  let editorCtx = null;
-  let editorFileInput = null;
-  let editorOriginalBase64 = '';
-  let editorRotation = 0;
-  let editorCrop = null;
-  let isDragging = false;
-  let dragStart = {x: 0, y: 0};
-  let currentCrop = null;
-  let editorAspectRatio = null; // { w, h } または null（フリー）
-  let activeHandle = null;
-  let dragStartCrop = null;
-  let dragStartMouse = null;
-  function initEditor() {
-    editorCanvas = document.getElementById('editor-canvas');
-    editorCtx = editorCanvas.getContext('2d');
-    editorCanvas.addEventListener('mouseup', onCropEnd);
-    editorCanvas.addEventListener('touchend', onCropEnd, {passive: false});
-        // ハンドルにイベントをバインド
-    document.querySelectorAll('.crop-handle').forEach(el => {
-      el.addEventListener('mousedown', function(e) {
-        const type = this.dataset.handle;
-        startHandleDrag(e, type);
-      });
-      el.addEventListener('touchstart', function(e) {
-        const type = this.dataset.handle;
-        startHandleDrag(e, type);
-      }, {passive: false});
-    });
-
-    editorCanvas.addEventListener('mousedown', function(e) {
-  // ハンドルがクリックされた場合はスルー（startHandleDrag が処理）
-  if (e.target.closest('.crop-handle')) return;
-  if (!editorCrop) return;
-  
-  const {x, y} = getImageCoords(e.clientX, e.clientY);
-  // クリック位置が枠内かチェック
-  if (x >= editorCrop.x && x <= editorCrop.x + editorCrop.w &&
-      y >= editorCrop.y && y <= editorCrop.y + editorCrop.h) {
-    isDraggingFrame = true;
-    dragStartFrame = {x, y};
-    dragStartCropPos = {x: editorCrop.x, y: editorCrop.y};
-    document.addEventListener('mousemove', onFrameDrag);
-    document.addEventListener('mouseup', endFrameDrag);
-  }
-});
-        // 枠全体移動（タッチ対応）
-    editorCanvas.addEventListener('touchstart', function(e) {
-      // ハンドルがタッチされた場合はスルー
-      if (e.target.closest('.crop-handle')) return;
-      if (!editorCrop) return;
-      const touch = e.touches[0];
-      const {x, y} = getImageCoords(touch.clientX, touch.clientY);
-      if (x >= editorCrop.x && x <= editorCrop.x + editorCrop.w &&
-          y >= editorCrop.y && y <= editorCrop.y + editorCrop.h) {
-        isDraggingFrame = true;
-        dragStartFrame = {x, y};
-        dragStartCropPos = {x: editorCrop.x, y: editorCrop.y};
-        document.addEventListener('touchmove', onFrameDragTouch, {passive: false});
-        document.addEventListener('touchend', endFrameDrag);
-      }
-    }, {passive: false});
-  }
-    function onFrameDragTouch(e) {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY });
-  onFrameDrag(mouseEvent);
-}
-
-      // キャンバス上の座標 → 元画像の座標に変換
-  function getImageCoords(clientX, clientY) {
-    const rect = editorCanvas.getBoundingClientRect();
-    const canvasX = (clientX - rect.left) * (editorCanvas.width / rect.width);
-    const canvasY = (clientY - rect.top) * (editorCanvas.height / rect.height);
-    // キャンバス中央を原点に
-    let cx = canvasX - editorCanvas.width/2;
-    let cy = canvasY - editorCanvas.height/2;
-    // 回転の逆変換（現在は回転がないので単純に戻す）
-    const rad = -editorRotation * Math.PI / 180;
-    const rx = cx * Math.cos(rad) - cy * Math.sin(rad);
-    const ry = cx * Math.sin(rad) + cy * Math.cos(rad);
-    // 元画像の表示スケールを考慮
-    const imgW = editorImage.width;
-    const imgH = editorImage.height;
-    const canvasW = editorCanvas.width;
-    const canvasH = editorCanvas.height;
-    const scale = Math.min(canvasW/imgW, canvasH/imgH);
-    const imgX = rx / scale + imgW/2;
-    const imgY = ry / scale + imgH/2;
-    return {x: imgX, y: imgY};
-  }
-
-// 枠全体移動用（ハンドル以外の場所をドラッグ）
-let isDraggingFrame = false;
-let dragStartFrame = {x: 0, y: 0};
-let dragStartCropPos = {x: 0, y: 0};
-
-
-
-function onFrameDrag(e) {
-  if (!isDraggingFrame) return;
-  const {x, y} = getImageCoords(e.clientX, e.clientY);
-  const dx = x - dragStartFrame.x;
-  const dy = y - dragStartFrame.y;
-  let newX = dragStartCropPos.x + dx;
-  let newY = dragStartCropPos.y + dy;
-  // 画像範囲内に制限
-  newX = Math.max(0, Math.min(editorImage.width - editorCrop.w, newX));
-  newY = Math.max(0, Math.min(editorImage.height - editorCrop.h, newY));
-  editorCrop.x = newX;
-  editorCrop.y = newY;
-  updateHandles();
-  drawEditorImage();
-}
-
-function endFrameDrag(e) {
-  isDraggingFrame = false;
-  document.removeEventListener('mousemove', onFrameDrag);
-  document.removeEventListener('mouseup', endFrameDrag);
-}
     
-  // 元画像の矩形 → キャンバス上の矩形（回転対応）
-  function getCanvasCoords(x, y, w, h) {
-    const imgW = editorImage.width;
-    const imgH = editorImage.height;
-    const canvasW = editorCanvas.width;
-    const canvasH = editorCanvas.height;
-    const scale = Math.min(canvasW/imgW, canvasH/imgH);
-    const cx = canvasW/2;
-    const cy = canvasH/2;
-    const centerX = x + w/2 - imgW/2;
-    const centerY = y + h/2 - imgH/2;
-    const rad = editorRotation * Math.PI / 180;
-    const rx = (centerX * Math.cos(rad) - centerY * Math.sin(rad)) * scale;
-    const ry = (centerX * Math.sin(rad) + centerY * Math.cos(rad)) * scale;
-    const rw = w * scale;
-    const rh = h * scale;
-    return { x: cx + rx - rw/2, y: cy + ry - rh/2, w: rw, h: rh };
-  }
+// ============================================================
+// 画像エディタ（再設計版）
+// ============================================================
+let editorImage = null;
+let editorCanvas = null;
+let editorCtx = null;
+let editorFileInput = null;
+let editorOriginalBase64 = '';
+let editorRotation = 0;
+let editorAspectRatio = null; // { w, h } または null
 
-  function openEditorModal(fileInput, imageBase64) {
-    editorFileInput = fileInput;
-    editorOriginalBase64 = imageBase64;
-    editorRotation = 0;
-        editorAspectRatio = null;
-    document.getElementById('aspect-ratio-indicator').textContent = 'フリー';
-    editorCrop = null;
-    currentCrop = null;
-    document.getElementById('crop-overlay').style.display = 'none';
-    document.getElementById('editor-status').textContent = '';
+// キャンバス上のトリミング矩形（ピクセル単位）
+let editorCrop = null; // { x, y, w, h }
 
-    const img = new Image();
-        img.onload = function() {
-      editorImage = img;
-      let w = img.width;
-      let h = img.height;
-      const maxW = 600;
-      if (w > maxW) {
-        h = h * maxW / w;
-        w = maxW;
-      }
-      editorCanvas.width = w;
-      editorCanvas.height = h;
-      
-      // ★★★ 画像全体を初期トリミング枠として設定 ★★★
-      editorCrop = { x: 0, y: 0, w: img.width, h: img.height };
-      updateHandles();  // 枠を表示
-      
-      drawEditorImage();
-      document.getElementById('image-editor-modal').style.display = 'flex';
-    };
-    img.onerror = function() {
-      alert('画像の読み込みに失敗しました。');
-    };
-    img.src = imageBase64;
-  }
-function drawEditorImage() {
-  if (!editorImage) return;
-  const ctx = editorCtx;
-  const canvas = editorCanvas;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.translate(canvas.width/2, canvas.height/2);
-  ctx.rotate(editorRotation * Math.PI / 180);
+// ドラッグ状態
+let isDragging = false;
+let dragType = null; // 'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e'
+let dragStartMouse = { x: 0, y: 0 };
+let dragStartCrop = { x: 0, y: 0, w: 0, h: 0 };
 
-  // 回転後の画像全体が収まるスケールを計算
+// ハンドルのサイズ（ピクセル）
+const HANDLE_SIZE = 12;
+
+function initEditor() {
+  editorCanvas = document.getElementById('editor-canvas');
+  editorCtx = editorCanvas.getContext('2d');
+
+  // マウスイベント
+  editorCanvas.addEventListener('mousedown', onEditorMouseDown);
+  window.addEventListener('mousemove', onEditorMouseMove);
+  window.addEventListener('mouseup', onEditorMouseUp);
+
+  // タッチイベント
+  editorCanvas.addEventListener('touchstart', onEditorTouchStart, { passive: false });
+  window.addEventListener('touchmove', onEditorTouchMove, { passive: false });
+  window.addEventListener('touchend', onEditorTouchUp, { passive: false });
+}
+
+// ---- 座標変換 ----
+function getCanvasCoords(clientX, clientY) {
+  const rect = editorCanvas.getBoundingClientRect();
+  const scaleX = editorCanvas.width / rect.width;
+  const scaleY = editorCanvas.height / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+// ---- 画像の表示スケール ----
+function getDisplayScale() {
+  if (!editorImage) return 1;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
   const imgW = editorImage.width;
   const imgH = editorImage.height;
-  const rad = editorRotation * Math.PI / 180;
-  const cos = Math.abs(Math.cos(rad));
-  const sin = Math.abs(Math.sin(rad));
-  const rotatedW = imgW * cos + imgH * sin;
-  const rotatedH = imgW * sin + imgH * cos;
+  return Math.min(canvasW / imgW, canvasH / imgH);
+}
 
-  // キャンバスサイズに合わせる（はみ出さないように縮小）
-  const canvasW = canvas.width;
-  const canvasH = canvas.height;
-  const scale = Math.min(canvasW / rotatedW, canvasH / rotatedH, 1); // 1以上には拡大しない
+// キャンバス座標 → 元画像座標
+function canvasToImage(cx, cy) {
+  const scale = getDisplayScale();
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
+  const offsetX = (canvasW - imgW * scale) / 2;
+  const offsetY = (canvasH - imgH * scale) / 2;
+  return {
+    x: (cx - offsetX) / scale,
+    y: (cy - offsetY) / scale
+  };
+}
 
+// 元画像座標 → キャンバス座標
+function imageToCanvas(ix, iy) {
+  const scale = getDisplayScale();
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
+  const offsetX = (canvasW - imgW * scale) / 2;
+  const offsetY = (canvasH - imgH * scale) / 2;
+  return {
+    x: ix * scale + offsetX,
+    y: iy * scale + offsetY
+  };
+}
+
+// ---- メイン描画 ----
+function drawEditorImage() {
+  const ctx = editorCtx;
+  const canvas = editorCanvas;
+  if (!editorImage) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 1. 画像を描画（アスペクト比を維持してフィット）
+  const scale = getDisplayScale();
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
   const drawW = imgW * scale;
   const drawH = imgH * scale;
+  const offsetX = (canvas.width - drawW) / 2;
+  const offsetY = (canvas.height - drawH) / 2;
 
-  if (editorCrop) {
-    const {x, y, w, h} = editorCrop;
-    // トリミング範囲を描画（元画像の座標をそのまま使う）
-    const scaleX = drawW / w;
-    const scaleY = drawH / h;
-    ctx.drawImage(editorImage, x, y, w, h, -drawW/2, -drawH/2, drawW, drawH);
-  } else {
-    ctx.drawImage(editorImage, -drawW/2, -drawH/2, drawW, drawH);
+  ctx.save();
+  // 回転処理（簡易対応：キャンバス中央で回転）
+  if (editorRotation !== 0) {
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(editorRotation * Math.PI / 180);
+    ctx.translate(-canvas.width / 2, -canvas.height / 2);
   }
+  ctx.drawImage(editorImage, offsetX, offsetY, drawW, drawH);
   ctx.restore();
-}
 
-    function onCropMove(e) {
-    if (!isDragging) return;
-    e.preventDefault();
-    const {x, y} = getImageCoords(e.clientX, e.clientY);
-    // dragStart は初回の座標で固定
-    // updateCrop 内で dragStart を使うので、dragStart は変わらない
-    updateCrop(x, y);
-  }
-
-  function onCropStart(e) {
-  e.preventDefault();
-  const {x, y} = getImageCoords(e.clientX, e.clientY);
-  isDragging = true;
-  dragStart = {x, y};
-  currentCrop = {x, y, w: 0, h: 0};
-}
-
-  function onCropEnd(e) {
-  if (!isDragging) return;
-  isDragging = false;
-  if (currentCrop && currentCrop.w > 5 && currentCrop.h > 5) {
-    editorCrop = {...currentCrop};
-    document.getElementById('editor-status').textContent = 'トリミング適用中（確定ボタンで反映）';
-  } else {
-    // ★★★ 枠を消さず、前の状態を維持 ★★★
-    // 何もしない（editorCrop は変更しない）
-    document.getElementById('editor-status').textContent = '枠が小さすぎます（ドラッグし直してください）';
-  }
-  // 常に枠を表示し続ける
+  // 2. トリミング枠があれば描画
   if (editorCrop) {
-    updateHandles();
+    const { x, y, w, h } = editorCrop;
+    // 枠（点線）
+    ctx.save();
+    ctx.strokeStyle = '#00d2ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+
+    // ハンドルを描画
+    const handles = [
+      { type: 'nw', cx: x, cy: y },
+      { type: 'ne', cx: x + w, cy: y },
+      { type: 'sw', cx: x, cy: y + h },
+      { type: 'se', cx: x + w, cy: y + h },
+      { type: 'n', cx: x + w/2, cy: y },
+      { type: 's', cx: x + w/2, cy: y + h },
+      { type: 'w', cx: x, cy: y + h/2 },
+      { type: 'e', cx: x + w, cy: y + h/2 }
+    ];
+    handles.forEach(h => {
+      ctx.fillStyle = '#00d2ff';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(h.cx, h.cy, HANDLE_SIZE/2, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    });
   }
+}
+
+// ---- ハンドル判定 ----
+function getHandleType(mx, my) {
+  if (!editorCrop) return null;
+  const { x, y, w, h } = editorCrop;
+  const half = HANDLE_SIZE / 2 + 4;
+  const handles = [
+    { type: 'nw', cx: x, cy: y },
+    { type: 'ne', cx: x + w, cy: y },
+    { type: 'sw', cx: x, cy: y + h },
+    { type: 'se', cx: x + w, cy: y + h },
+    { type: 'n', cx: x + w/2, cy: y },
+    { type: 's', cx: x + w/2, cy: y + h },
+    { type: 'w', cx: x, cy: y + h/2 },
+    { type: 'e', cx: x + w, cy: y + h/2 }
+  ];
+  for (let h of handles) {
+    if (Math.abs(mx - h.cx) < half && Math.abs(my - h.cy) < half) {
+      return h.type;
+    }
+  }
+  // 枠の内部なら移動
+  if (mx >= x + half && mx <= x + w - half &&
+      my >= y + half && my <= y + h - half) {
+    return 'move';
+  }
+  return null;
+}
+
+// ---- マウスイベント ----
+function onEditorMouseDown(e) {
+  e.preventDefault();
+  const pos = getCanvasCoords(e.clientX, e.clientY);
+  const handle = getHandleType(pos.x, pos.y);
+  if (!handle) return;
+
+  isDragging = true;
+  dragType = handle;
+  dragStartMouse = { x: pos.x, y: pos.y };
+  dragStartCrop = { ...editorCrop };
+}
+
+function onEditorMouseMove(e) {
+  if (!isDragging) return;
+  e.preventDefault();
+  const pos = getCanvasCoords(e.clientX, e.clientY);
+  handleDrag(pos.x, pos.y);
+}
+
+function onEditorMouseUp(e) {
+  if (isDragging) {
+    isDragging = false;
+    dragType = null;
+  }
+}
+
+// ---- タッチイベント ----
+function onEditorTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const pos = getCanvasCoords(touch.clientX, touch.clientY);
+  const handle = getHandleType(pos.x, pos.y);
+  if (!handle) return;
+
+  isDragging = true;
+  dragType = handle;
+  dragStartMouse = { x: pos.x, y: pos.y };
+  dragStartCrop = { ...editorCrop };
+}
+
+function onEditorTouchMove(e) {
+  e.preventDefault();
+  if (!isDragging) return;
+  const touch = e.touches[0];
+  const pos = getCanvasCoords(touch.clientX, touch.clientY);
+  handleDrag(pos.x, pos.y);
+}
+
+function onEditorTouchUp(e) {
+  if (isDragging) {
+    isDragging = false;
+    dragType = null;
+  }
+}
+
+// ---- ドラッグ中処理 ----
+function handleDrag(mx, my) {
+  if (!editorCrop) return;
+  let { x, y, w, h } = dragStartCrop;
+  const dx = mx - dragStartMouse.x;
+  const dy = my - dragStartMouse.y;
+
+  // アスペクト比ロック
+  const lockAspect = editorAspectRatio !== null;
+  const ratio = lockAspect ? editorAspectRatio.w / editorAspectRatio.h : null;
+
+  // 各ハンドルで更新
+  switch (dragType) {
+    case 'move':
+      x += dx;
+      y += dy;
+      break;
+    case 'nw':
+      x += dx;
+      y += dy;
+      w -= dx;
+      h -= dy;
+      break;
+    case 'ne':
+      y += dy;
+      w += dx;
+      h -= dy;
+      break;
+    case 'sw':
+      x += dx;
+      w -= dx;
+      h += dy;
+      break;
+    case 'se':
+      w += dx;
+      h += dy;
+      break;
+    case 'n':
+      y += dy;
+      h -= dy;
+      break;
+    case 's':
+      h += dy;
+      break;
+    case 'w':
+      x += dx;
+      w -= dx;
+      break;
+    case 'e':
+      w += dx;
+      break;
+    default:
+      return;
+  }
+
+  // 最小サイズ
+  const minSize = 10;
+  if (w < minSize) w = minSize;
+  if (h < minSize) h = minSize;
+
+  // アスペクト比ロック（リサイズ後）
+  if (lockAspect) {
+    // 現在の中心を維持しながら縦横比を調整
+    const centerX = x + w / 2;
+    const centerY = y + h / 2;
+    let newW = w;
+    let newH = w / ratio;
+    if (newH < minSize) {
+      newH = minSize;
+      newW = newH * ratio;
+    }
+    // 中心を保つ
+    x = centerX - newW / 2;
+    y = centerY - newH / 2;
+    w = newW;
+    h = newH;
+  }
+
+  // 画像の範囲内に収める（キャンバス全体ではなく、画像表示領域内）
+  const scale = getDisplayScale();
+  const imgW = editorImage.width * scale;
+  const imgH = editorImage.height * scale;
+  const offsetX = (editorCanvas.width - imgW) / 2;
+  const offsetY = (editorCanvas.height - imgH) / 2;
+
+  // 矩形が画像領域からはみ出ないように制限
+  if (x < offsetX) { w -= (offsetX - x); x = offsetX; }
+  if (y < offsetY) { h -= (offsetY - y); y = offsetY; }
+  if (x + w > offsetX + imgW) { w = offsetX + imgW - x; }
+  if (y + h > offsetY + imgH) { h = offsetY + imgH - y; }
+  if (w < minSize) w = minSize;
+  if (h < minSize) h = minSize;
+
+  editorCrop = { x, y, w, h };
   drawEditorImage();
 }
 
-  function onCropStartTouch(e) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousedown', {clientX: touch.clientX, clientY: touch.clientY});
-    onCropStart(mouseEvent);
-  }
-  function onCropMoveTouch(e) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousemove', {clientX: touch.clientX, clientY: touch.clientY});
-    onCropMove(mouseEvent);
-  }
+// ---- モーダル開く ----
+function openEditorModal(fileInput, imageBase64) {
+  editorFileInput = fileInput;
+  editorOriginalBase64 = imageBase64;
+  editorRotation = 0;
+  editorAspectRatio = null;
+  document.getElementById('aspect-ratio-indicator').textContent = 'フリー';
 
-    function updateCrop(imgX, imgY) {
-    const {x: sx, y: sy} = dragStart;
-    let left = Math.min(sx, imgX);
-    let top = Math.min(sy, imgY);
-    let right = Math.max(sx, imgX);
-    let bottom = Math.max(sy, imgY);
-    left = Math.max(0, left);
-    top = Math.max(0, top);
-    right = Math.min(editorImage.width, right);
-    bottom = Math.min(editorImage.height, bottom);
-    let crop = {x: left, y: top, w: right - left, h: bottom - top};
-    // アスペクト比ロックがかかっていれば調整
-    if (editorAspectRatio) {
-      const targetRatio = editorAspectRatio.w / editorAspectRatio.h;
-      const currentRatio = crop.w / crop.h;
-      if (Math.abs(currentRatio - targetRatio) > 0.01) {
-        const newH = crop.w / targetRatio;
-        if (newH <= editorImage.height - crop.y) {
-          crop.h = newH;
-        } else {
-          const newW = crop.h * targetRatio;
-          if (newW <= editorImage.width - crop.x) {
-            crop.w = newW;
-          }
-        }
-      }
+  const img = new Image();
+  img.onload = function() {
+    editorImage = img;
+    const canvas = editorCanvas;
+    const maxW = 600;
+    let w = img.width;
+    let h = img.height;
+    if (w > maxW) {
+      h = h * maxW / w;
+      w = maxW;
     }
-    editorCrop = crop;
-    // オーバーレイとハンドルを更新
-    updateHandles();
-  }
+    canvas.width = w;
+    canvas.height = h;
 
-      function updateHandles() {
-    const overlay = document.getElementById('crop-overlay');
-    const handles = overlay.querySelectorAll('.crop-handle');
-    if (!editorCrop) {
-      handles.forEach(h => h.style.display = 'none');
-      overlay.style.display = 'none';
-      return;
-    }
-    const pos = getCanvasCoords(editorCrop.x, editorCrop.y, editorCrop.w, editorCrop.h);
-    overlay.style.left = pos.x + 'px';
-    overlay.style.top = pos.y + 'px';
-    overlay.style.width = pos.w + 'px';
-    overlay.style.height = pos.h + 'px';
-    overlay.style.display = 'block';
-    handles.forEach(h => h.style.display = 'block');
-  }
+    // 初期トリミングは画像全体（キャンバス上の画像表示範囲）
+    const scale = getDisplayScale();
+    const imgW = img.width * scale;
+    const imgH = img.height * scale;
+    const offsetX = (canvas.width - imgW) / 2;
+    const offsetY = (canvas.height - imgH) / 2;
+    editorCrop = { x: offsetX, y: offsetY, w: imgW, h: imgH };
 
-  function startHandleDrag(e, handleType) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!editorCrop) return;
-    activeHandle = handleType;
-    dragStartCrop = {...editorCrop};
-    const rect = editorCanvas.getBoundingClientRect();
-    dragStartMouse = {
-      x: (e.clientX - rect.left) * (editorCanvas.width / rect.width),
-      y: (e.clientY - rect.top) * (editorCanvas.height / rect.height)
-    };
-    document.addEventListener('mousemove', onHandleDrag);
-    document.addEventListener('mouseup', endHandleDrag);
-    document.addEventListener('touchmove', onHandleDragTouch, {passive: false});
-    document.addEventListener('touchend', endHandleDrag);
-  }
-
-  function onHandleDrag(e) {
-    e.preventDefault();
-    const rect = editorCanvas.getBoundingClientRect();
-    const canvasX = (e.clientX - rect.left) * (editorCanvas.width / rect.width);
-    const canvasY = (e.clientY - rect.top) * (editorCanvas.height / rect.height);
-    const imgCoords = getImageCoords(e.clientX, e.clientY);
-    const dx = imgCoords.x - dragStartMouse.x;
-    const dy = imgCoords.y - dragStartMouse.y;
-    let newCrop = {...dragStartCrop};
-    switch (activeHandle) {
-      case 'nw': newCrop.x += dx; newCrop.y += dy; newCrop.w -= dx; newCrop.h -= dy; break;
-      case 'ne': newCrop.y += dy; newCrop.w += dx; newCrop.h -= dy; break;
-      case 'sw': newCrop.x += dx; newCrop.w -= dx; newCrop.h += dy; break;
-      case 'se': newCrop.w += dx; newCrop.h += dy; break;
-      case 'n': newCrop.y += dy; newCrop.h -= dy; break;
-      case 's': newCrop.h += dy; break;
-      case 'w': newCrop.x += dx; newCrop.w -= dx; break;
-      case 'e': newCrop.w += dx; break;
-      default: return;
-    }
-    if (newCrop.w < 10) newCrop.w = 10;
-    if (newCrop.h < 10) newCrop.h = 10;
-    newCrop.x = Math.max(0, newCrop.x);
-    newCrop.y = Math.max(0, newCrop.y);
-    if (newCrop.x + newCrop.w > editorImage.width) newCrop.w = editorImage.width - newCrop.x;
-    if (newCrop.y + newCrop.h > editorImage.height) newCrop.h = editorImage.height - newCrop.y;
-    if (editorAspectRatio) {
-      const targetRatio = editorAspectRatio.w / editorAspectRatio.h;
-      let newW = newCrop.w;
-      let newH = newCrop.w / targetRatio;
-      if (newH > editorImage.height - newCrop.y) {
-        newH = editorImage.height - newCrop.y;
-        newW = newH * targetRatio;
-        if (newW > editorImage.width - newCrop.x) newW = editorImage.width - newCrop.x;
-      }
-      newCrop.w = newW;
-      newCrop.h = newH;
-    }
-    editorCrop = newCrop;
-    updateHandles();
     drawEditorImage();
+    document.getElementById('image-editor-modal').style.display = 'flex';
+  };
+  img.onerror = function() {
+    alert('画像の読み込みに失敗しました。');
+  };
+  img.src = imageBase64;
+}
+
+// ---- 編集確定 ----
+function confirmEditor() {
+  if (!editorImage || !editorCrop) {
+    alert('トリミング領域がありません。');
+    return;
   }
 
-  function onHandleDragTouch(e) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY });
-    onHandleDrag(mouseEvent);
+  // キャンバス上の矩形を元画像座標に変換
+  const { x, y, w, h } = editorCrop;
+  const scale = getDisplayScale();
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
+  const offsetX = (canvasW - imgW * scale) / 2;
+  const offsetY = (canvasH - imgH * scale) / 2;
+
+  // 元画像上のピクセル座標
+  const srcX = (x - offsetX) / scale;
+  const srcY = (y - offsetY) / scale;
+  const srcW = w / scale;
+  const srcH = h / scale;
+
+  // 範囲をクランプ
+  const sx = Math.max(0, Math.min(imgW, srcX));
+  const sy = Math.max(0, Math.min(imgH, srcY));
+  const sw = Math.min(imgW - sx, srcW);
+  const sh = Math.min(imgH - sy, srcH);
+
+  if (sw < 2 || sh < 2) {
+    alert('切り抜き範囲が小さすぎます。');
+    return;
   }
 
-  function endHandleDrag(e) {
-    activeHandle = null;
-    dragStartCrop = null;
-    dragStartMouse = null;
-    document.removeEventListener('mousemove', onHandleDrag);
-    document.removeEventListener('mouseup', endHandleDrag);
-    document.removeEventListener('touchmove', onHandleDragTouch);
-    document.removeEventListener('touchend', endHandleDrag);
+  // 元画像から切り抜き
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = sw;
+  tempCanvas.height = sh;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(editorImage, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.92);
+
+  // 編集済みデータをファイル入力に保存
+  if (editorFileInput) {
+    editorFileInput.dataset.editedBase64 = croppedDataUrl;
+    editorFileInput.value = '';
   }
 
-      function setAspectRatio(w, h) {
-    if (w === 0 && h === 0) {
-      editorAspectRatio = null;
-      document.getElementById('aspect-ratio-indicator').textContent = 'フリー';
-    } else {
-      editorAspectRatio = {w, h};
-      document.getElementById('aspect-ratio-indicator').textContent = w + ':' + h;
-      if (editorCrop) {
-        const targetRatio = w / h;
-        const currentRatio = editorCrop.w / editorCrop.h;
-        if (Math.abs(currentRatio - targetRatio) > 0.01) {
-          const newH = editorCrop.w / targetRatio;
-          if (newH <= editorImage.height - editorCrop.y) {
-            editorCrop.h = newH;
-          } else {
-            const newW = editorCrop.h * targetRatio;
-            if (newW <= editorImage.width - editorCrop.x) {
-              editorCrop.w = newW;
-            }
-          }
-          updateHandles();
-          drawEditorImage();
-        }
-      }
+  closeEditorModal();
+  document.getElementById('editor-status').textContent = '✅ 編集完了！';
+}
+
+// ---- その他ユーティリティ ----
+function resetCrop() {
+  if (!editorImage) return;
+  const scale = getDisplayScale();
+  const imgW = editorImage.width * scale;
+  const imgH = editorImage.height * scale;
+  const offsetX = (editorCanvas.width - imgW) / 2;
+  const offsetY = (editorCanvas.height - imgH) / 2;
+  editorCrop = { x: offsetX, y: offsetY, w: imgW, h: imgH };
+  drawEditorImage();
+  document.getElementById('editor-status').textContent = 'トリミング解除';
+}
+
+function rotateImage(degrees) {
+  editorRotation = (editorRotation + degrees) % 360;
+  // 回転後もトリミング領域を再計算（単純にそのまま維持）
+  drawEditorImage();
+  document.getElementById('editor-status').textContent = '回転: ' + editorRotation + '°';
+}
+
+function setAspectRatio(w, h) {
+  if (w === 0 && h === 0) {
+    editorAspectRatio = null;
+    document.getElementById('aspect-ratio-indicator').textContent = 'フリー';
+  } else {
+    editorAspectRatio = { w, h };
+    document.getElementById('aspect-ratio-indicator').textContent = w + ':' + h;
+    // 現在の矩形をアスペクト比に合わせる
+    if (editorCrop) {
+      const ratio = w / h;
+      const centerX = editorCrop.x + editorCrop.w / 2;
+      const centerY = editorCrop.y + editorCrop.h / 2;
+      let newW = editorCrop.w;
+      let newH = newW / ratio;
+      if (newH < 10) { newH = 10; newW = newH * ratio; }
+      // 画像範囲内に収める
+      const scale = getDisplayScale();
+      const imgW = editorImage.width * scale;
+      const imgH = editorImage.height * scale;
+      const offsetX = (editorCanvas.width - imgW) / 2;
+      const offsetY = (editorCanvas.height - imgH) / 2;
+      let x = centerX - newW / 2;
+      let y = centerY - newH / 2;
+      if (x < offsetX) x = offsetX;
+      if (y < offsetY) y = offsetY;
+      if (x + newW > offsetX + imgW) x = offsetX + imgW - newW;
+      if (y + newH > offsetY + imgH) y = offsetY + imgH - newH;
+      editorCrop = { x, y, w: newW, h: newH };
+      drawEditorImage();
     }
   }
-    
-  function resetCrop() {
-    editorCrop = null;
-    currentCrop = null;
-    document.getElementById('crop-overlay').style.display = 'none';
-    document.getElementById('editor-status').textContent = '';
-    drawEditorImage();
-  }
+}
 
-  function rotateImage(degrees) {
-    editorRotation = (editorRotation + degrees) % 360;
-    drawEditorImage();
-    document.getElementById('editor-status').textContent = '回転: ' + editorRotation + '°';
-  }
+function closeEditorModal() {
+  document.getElementById('image-editor-modal').style.display = 'none';
+  editorImage = null;
+  editorFileInput = null;
+  editorCrop = null;
+  editorRotation = 0;
+  document.getElementById('editor-status').textContent = '';
+}
 
-  function confirmEditor() {
-    if (!editorImage) return;
-    const dataUrl = editorCanvas.toDataURL('image/webp', 0.92);
-    if (editorFileInput) {
-      editorFileInput.dataset.editedBase64 = dataUrl;
-      editorFileInput.value = '';
-    }
-    closeEditorModal();
-    document.getElementById('editor-status').textContent = '✅ 編集完了！';
-  }
+// ---- ファイル選択ハンドラ（既存のものを上書き） ----
+function handleFileSelect(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = function(e) {
+    openEditorModal(input, e.target.result);
+  };
+  reader.onerror = function() {
+    alert('ファイル読み込みエラー');
+  };
+}
 
-  function closeEditorModal() {
-    document.getElementById('image-editor-modal').style.display = 'none';
-    editorImage = null;
-    editorFileInput = null;
-    editorCrop = null;
-    currentCrop = null;
-    document.getElementById('crop-overlay').style.display = 'none';
-    document.getElementById('editor-status').textContent = '';
-    editorRotation = 0;
+// ---- Base64取得（編集済み優先） ----
+async function getImageBase64(inputElement, maxWidth = 800, quality = 0.7) {
+  if (inputElement.dataset && inputElement.dataset.editedBase64) {
+    return inputElement.dataset.editedBase64;
   }
-
-  function handleFileSelect(input) {
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = function(e) {
-      openEditorModal(input, e.target.result);
-    };
-    reader.onerror = function() {
-      alert('ファイル読み込みエラー');
-    };
+  if (inputElement.files && inputElement.files[0]) {
+    return await fileToBase64(inputElement.files[0], maxWidth, quality);
   }
+  return '';
+}
 
-  // 編集済みBase64を優先するラッパー関数
-  async function getImageBase64(inputElement, maxWidth = 800, quality = 0.7) {
-    if (inputElement.dataset && inputElement.dataset.editedBase64) {
-      return inputElement.dataset.editedBase64;
-    }
-    if (inputElement.files && inputElement.files[0]) {
-      return await fileToBase64(inputElement.files[0], maxWidth, quality);
-    }
-    return '';
-  }
-
-  // 編集モーダルの「確定」ボタンにイベントをバインド
-  document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('editor-confirm-btn').addEventListener('click', confirmEditor);
-    initEditor();
-  });
-    
+// ---- 初期化 ----
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('editor-confirm-btn').addEventListener('click', confirmEditor);
+  initEditor();
+});
 // ★★★ クーポン発行関数（修正） ★★★
 async function publishCoupon() {
   const code = document.getElementById('coupon-code').value.trim();
