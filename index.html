@@ -2789,11 +2789,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function initEditor() {
     editorCanvas = document.getElementById('editor-canvas');
     editorCtx = editorCanvas.getContext('2d');
-    editorCanvas.addEventListener('mousedown', onCropStart);
-    editorCanvas.addEventListener('mousemove', onCropMove);
     editorCanvas.addEventListener('mouseup', onCropEnd);
-    editorCanvas.addEventListener('touchstart', onCropStartTouch, {passive: false});
-    editorCanvas.addEventListener('touchmove', onCropMoveTouch, {passive: false});
     editorCanvas.addEventListener('touchend', onCropEnd, {passive: false});
         // ハンドルにイベントをバインド
     document.querySelectorAll('.crop-handle').forEach(el => {
@@ -2806,7 +2802,46 @@ document.addEventListener('DOMContentLoaded', function() {
         startHandleDrag(e, type);
       }, {passive: false});
     });
+
+    editorCanvas.addEventListener('mousedown', function(e) {
+  // ハンドルがクリックされた場合はスルー（startHandleDrag が処理）
+  if (e.target.closest('.crop-handle')) return;
+  if (!editorCrop) return;
+  
+  const {x, y} = getImageCoords(e.clientX, e.clientY);
+  // クリック位置が枠内かチェック
+  if (x >= editorCrop.x && x <= editorCrop.x + editorCrop.w &&
+      y >= editorCrop.y && y <= editorCrop.y + editorCrop.h) {
+    isDraggingFrame = true;
+    dragStartFrame = {x, y};
+    dragStartCropPos = {x: editorCrop.x, y: editorCrop.y};
+    document.addEventListener('mousemove', onFrameDrag);
+    document.addEventListener('mouseup', endFrameDrag);
   }
+});
+        // 枠全体移動（タッチ対応）
+    editorCanvas.addEventListener('touchstart', function(e) {
+      // ハンドルがタッチされた場合はスルー
+      if (e.target.closest('.crop-handle')) return;
+      if (!editorCrop) return;
+      const touch = e.touches[0];
+      const {x, y} = getImageCoords(touch.clientX, touch.clientY);
+      if (x >= editorCrop.x && x <= editorCrop.x + editorCrop.w &&
+          y >= editorCrop.y && y <= editorCrop.y + editorCrop.h) {
+        isDraggingFrame = true;
+        dragStartFrame = {x, y};
+        dragStartCropPos = {x: editorCrop.x, y: editorCrop.y};
+        document.addEventListener('touchmove', onFrameDragTouch, {passive: false});
+        document.addEventListener('touchend', endFrameDrag);
+      }
+    }, {passive: false});
+  }
+    function onFrameDragTouch(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY });
+  onFrameDrag(mouseEvent);
+}
 
       // キャンバス上の座標 → 元画像の座標に変換
   function getImageCoords(clientX, clientY) {
@@ -2831,6 +2866,35 @@ document.addEventListener('DOMContentLoaded', function() {
     return {x: imgX, y: imgY};
   }
 
+// 枠全体移動用（ハンドル以外の場所をドラッグ）
+let isDraggingFrame = false;
+let dragStartFrame = {x: 0, y: 0};
+let dragStartCropPos = {x: 0, y: 0};
+
+
+
+function onFrameDrag(e) {
+  if (!isDraggingFrame) return;
+  const {x, y} = getImageCoords(e.clientX, e.clientY);
+  const dx = x - dragStartFrame.x;
+  const dy = y - dragStartFrame.y;
+  let newX = dragStartCropPos.x + dx;
+  let newY = dragStartCropPos.y + dy;
+  // 画像範囲内に制限
+  newX = Math.max(0, Math.min(editorImage.width - editorCrop.w, newX));
+  newY = Math.max(0, Math.min(editorImage.height - editorCrop.h, newY));
+  editorCrop.x = newX;
+  editorCrop.y = newY;
+  updateHandles();
+  drawEditorImage();
+}
+
+function endFrameDrag(e) {
+  isDraggingFrame = false;
+  document.removeEventListener('mousemove', onFrameDrag);
+  document.removeEventListener('mouseup', endFrameDrag);
+}
+    
   // 元画像の矩形 → キャンバス上の矩形（回転対応）
   function getCanvasCoords(x, y, w, h) {
     const imgW = editorImage.width;
