@@ -2862,7 +2862,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editor-status').textContent = '';
 
     const img = new Image();
-    img.onload = function() {
+        img.onload = function() {
       editorImage = img;
       let w = img.width;
       let h = img.height;
@@ -2873,6 +2873,11 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       editorCanvas.width = w;
       editorCanvas.height = h;
+      
+      // ★★★ 画像全体を初期トリミング枠として設定 ★★★
+      editorCrop = { x: 0, y: 0, w: img.width, h: img.height };
+      updateHandles();  // 枠を表示
+      
       drawEditorImage();
       document.getElementById('image-editor-modal').style.display = 'flex';
     };
@@ -2926,18 +2931,22 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
   function onCropEnd(e) {
-    if (!isDragging) return;
-    isDragging = false;
-    if (currentCrop && currentCrop.w > 5 && currentCrop.h > 5) {
-      editorCrop = {...currentCrop};
-      document.getElementById('editor-status').textContent = 'トリミング適用中（確定ボタンで反映）';
-    } else {
-      editorCrop = null;
-      document.getElementById('crop-overlay').style.display = 'none';
-      document.getElementById('editor-status').textContent = '';
-    }
-    drawEditorImage();
+  if (!isDragging) return;
+  isDragging = false;
+  if (currentCrop && currentCrop.w > 5 && currentCrop.h > 5) {
+    editorCrop = {...currentCrop};
+    document.getElementById('editor-status').textContent = 'トリミング適用中（確定ボタンで反映）';
+  } else {
+    // ★★★ 枠を消さず、前の状態を維持 ★★★
+    // 何もしない（editorCrop は変更しない）
+    document.getElementById('editor-status').textContent = '枠が小さすぎます（ドラッグし直してください）';
   }
+  // 常に枠を表示し続ける
+  if (editorCrop) {
+    updateHandles();
+  }
+  drawEditorImage();
+}
 
   function onCropStartTouch(e) {
     e.preventDefault();
