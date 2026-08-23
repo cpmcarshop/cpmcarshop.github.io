@@ -3182,13 +3182,11 @@ function confirmEditor() {
   const offsetX = (canvasW - imgW * scale) / 2;
   const offsetY = (canvasH - imgH * scale) / 2;
 
-  // 元画像上のピクセル座標
   const srcX = (x - offsetX) / scale;
   const srcY = (y - offsetY) / scale;
   const srcW = w / scale;
   const srcH = h / scale;
 
-  // 範囲をクランプ
   const sx = Math.max(0, Math.min(imgW, srcX));
   const sy = Math.max(0, Math.min(imgH, srcY));
   const sw = Math.min(imgW - sx, srcW);
@@ -3199,7 +3197,6 @@ function confirmEditor() {
     return;
   }
 
-  // 元画像から切り抜き
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = sw;
   tempCanvas.height = sh;
@@ -3208,10 +3205,22 @@ function confirmEditor() {
 
   const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.92);
 
-  // 編集済みデータをファイル入力に保存
   if (editorFileInput) {
     editorFileInput.dataset.editedBase64 = croppedDataUrl;
-    editorFileInput.value = '';
+    editorFileInput.value = ''; // ファイル選択をクリア（表示は「選択されていません」になる）
+
+    // ★★★ 編集状態を表示 ★★★
+    const parent = editorFileInput.parentNode;
+    let statusSpan = parent.querySelector('.file-status');
+    if (!statusSpan) {
+      statusSpan = document.createElement('span');
+      statusSpan.className = 'file-status';
+      parent.appendChild(statusSpan);
+    }
+    statusSpan.textContent = ' ✅ 編集済み（再選択で上書き）';
+    statusSpan.style.color = '#4caf50';
+    statusSpan.style.marginLeft = '5px';
+    statusSpan.style.fontSize = '0.9rem';
   }
 
   closeEditorModal();
@@ -3285,6 +3294,17 @@ function closeEditorModal() {
 
 // ---- ファイル選択ハンドラ（既存のものを上書き） ----
 function handleFileSelect(input) {
+  // 編集状態をリセット（新しくファイルが選択されたら）
+  const parent = input.parentNode;
+  let statusSpan = parent.querySelector('.file-status');
+  if (!statusSpan) {
+    statusSpan = document.createElement('span');
+    statusSpan.className = 'file-status';
+    parent.appendChild(statusSpan);
+  }
+  statusSpan.textContent = ' ファイル読み込み中...';
+  statusSpan.style.color = '#ffd700';
+
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   const reader = new FileReader();
@@ -3293,10 +3313,11 @@ function handleFileSelect(input) {
     openEditorModal(input, e.target.result);
   };
   reader.onerror = function() {
+    statusSpan.textContent = ' ❌ 読み込みエラー';
+    statusSpan.style.color = '#e94560';
     alert('ファイル読み込みエラー');
   };
 }
-
 // ---- Base64取得（編集済み優先） ----
 async function getImageBase64(inputElement, maxWidth = 800, quality = 0.7) {
   if (inputElement.dataset && inputElement.dataset.editedBase64) {
