@@ -1687,9 +1687,9 @@ async function loadHomeCars(force = false) {
   // 修正後
 if (!force && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
   console.log('ホーム: キャッシュを使用');
-  // ★ ここに1行追加（キャッシュのデータ件数を表示）
   document.getElementById('total-car-count').innerText = cached.data.length;
-  renderCarGrid('home-car-grid', cached.data);
+  const enrichedCars = await enrichCarsWithMakerIcons(cached.data);  // ← この1行を追加
+  renderCarGrid('home-car-grid', enrichedCars);  // ← ここを cached.data → enrichedCars に変更
   return;
 }
   isInitialLoad = true;
