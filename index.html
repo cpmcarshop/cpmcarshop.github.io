@@ -1937,14 +1937,22 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
       priceDisplay = `<p style="color:var(--main-color); font-weight:bold;">${c.priceRange}</p>`;
     }
 
-    return `
-      <div class="card">
-        ${rankBadge}
-        ${couponBadge}
-        ${saleBadge}
-        <span class="card-badge">${c.status}</span>
-       <img src="${addRwParam(c.img1) || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
-        <div class="card-body">
+    // ★ メーカーアイコンを取得（フォールバック付き）
+const iconUrl = c.maker?.iconUrl || c.makerIcon || 'https://placehold.co/40x40?text=M';
+
+return `
+  <div class="card">
+    ${rankBadge}${couponBadge}${saleBadge}
+    <span class="card-badge">${c.status}</span>
+    
+    <!-- ★ 画像とアイコンをラップ -->
+    <div style="position: relative;">
+      <img src="${addRwParam(c.img1) || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
+      <img src="${addRwParam(iconUrl)}" 
+           style="position: absolute; bottom: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; background: #000; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 2;">
+    </div>
+
+    <div class="card-body">
           <div class="card-subtitle">${c.makerName}</div>
           <h3 class="card-title">${c.carName}</h3>
           <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
@@ -2073,35 +2081,30 @@ async function openCarDetail(carId) {
   if (!car) return;
   currentCarDetail = car;
 
-  // ★ 3秒後に視聴数をカウント（ローディング表示なしで実行）
-  if (!viewedCarIds[carId]) {
-    viewedCarIds[carId] = true;
-    setTimeout(async () => {
-      try {
-        // ★ 第3引数に false を渡してローディング表示をスキップ
-        await callGasApi('incrementViewCount', { carId: carId }, false);
-        console.log('視聴数カウント: ' + carId);
-      } catch (e) {
-        console.error('視聴数カウントエラー:', e);
-      }
-    }, 3000);
-  }
+  // ★ メーカーアイコン取得
+  const iconUrl = car.maker?.iconUrl || 'https://placehold.co/48x48?text=M';
 
-      // 画像リストを構築（img1〜img4 で有効なもの）
-      carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
-      carouselIndex = 0;
+  // ★ 画像リスト
+  carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
+  carouselIndex = 0;
 
-      const body = document.getElementById('detail-modal-body');
-     body.innerHTML = `
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
-    <div>
-      <h2 style="margin:0;">${car.carName}</h2>
-      <p style="color:var(--main-color); margin:5px 0;">${car.maker ? car.maker.makerName : ''}</p>
+  const body = document.getElementById('detail-modal-body');
+  body.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <!-- ★ 左側：アイコン + 車名・メーカー名 -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="${addRwParam(iconUrl)}" 
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--main-color); background: #000;">
+        <div>
+          <h2 style="margin:0;">${car.carName}</h2>
+          <p style="color:var(--main-color); margin:5px 0;">${car.maker ? car.maker.makerName : ''}</p>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="shareCarLink('${car.carId}', '${car.carName}')" style="font-size:0.85rem; padding:6px 14px;">
+        📤 共有
+      </button>
     </div>
-    <button class="btn btn-secondary" onclick="shareCarLink('${car.carId}', '${car.carName}')" style="font-size:0.85rem; padding:6px 14px;">
-      📤 共有
-    </button>
-  </div>
+
 
         <!-- カルーセル -->
         <div id="carousel-container" class="carousel-container">
