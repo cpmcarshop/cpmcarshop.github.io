@@ -793,8 +793,9 @@
       <div class="form-group"><label>CPM ID</label><input type="text" id="m-cpmid" placeholder="例: AB123456"></div>
       <div class="form-group"><label>Twitter(X) ID (@なし)</label><input type="text" id="m-twitter"></div>
       <div class="form-group"><label>自由リンク(HP等)</label><input type="text" id="m-link"></div>
-      <div class="form-group"><label>アイコン画像</label><input type="file" id="m-icon" accept="image/*"></div>
-      <div class="form-group"><label>ヘッダー画像</label><input type="file" id="m-header" accept="image/*"></div>
+      <div class="form-group"><label>アイコン画像</label><input type="file" id="m-icon" accept="image/*" onchange="handleFileSelect(this)">
+</div>
+      <div class="form-group"><label>ヘッダー画像</label><input type="file" id="m-header" accept="image/*" onchange="handleFileSelect(this)"></div>
       <button class="btn" onclick="submitMaker()">メーカー情報を保存</button>
       <button class="btn btn-secondary" onclick="closeModal('maker-modal')">キャンセル</button>
     </div>
@@ -838,10 +839,10 @@
       <div class="form-group">
         <label>車両画像（画像1枚目がメイン・サムネイル画像になります）</label>
         <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;">※画像を選択しなかった枠は、既存の画像が保持されます。</div>
-        1枚目 (メイン): <input type="file" id="c-img1" accept="image/*"><br>
-        2枚目: <input type="file" id="c-img2" accept="image/*"><br>
-        3枚目: <input type="file" id="c-img3" accept="image/*"><br>
-        4枚目: <input type="file" id="c-img4" accept="image/*">
+        1枚目 (メイン): <input type="file" id="c-img1" accept="image/*" onchange="handleFileSelect(this)"><br>
+        2枚目: <input type="file" id="c-img2" accept="image/*" onchange="handleFileSelect(this)"><br>
+        3枚目: <input type="file" id="c-img3" accept="image/*" onchange="handleFileSelect(this)"><br>
+        4枚目: <input type="file" id="c-img4" accept="image/*" onchange="handleFileSelect(this)">
       </div>
 
       <!-- 動的サブフォーム: グレード -->
@@ -2745,6 +2746,220 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+      // ============================================================
+  // 画像エディタ（トリミング・回転）
+  // ============================================================
+  let editorImage = null;
+  let editorCanvas = null;
+  let editorCtx = null;
+  let editorFileInput = null;
+  let editorOriginalBase64 = '';
+  let editorRotation = 0;
+  let editorCrop = null;
+  let isDragging = false;
+  let dragStart = {x: 0, y: 0};
+  let currentCrop = null;
+
+  function initEditor() {
+    editorCanvas = document.getElementById('editor-canvas');
+    editorCtx = editorCanvas.getContext('2d');
+    editorCanvas.addEventListener('mousedown', onCropStart);
+    editorCanvas.addEventListener('mousemove', onCropMove);
+    editorCanvas.addEventListener('mouseup', onCropEnd);
+    editorCanvas.addEventListener('touchstart', onCropStartTouch, {passive: false});
+    editorCanvas.addEventListener('touchmove', onCropMoveTouch, {passive: false});
+    editorCanvas.addEventListener('touchend', onCropEnd, {passive: false});
+  }
+
+  function openEditorModal(fileInput, imageBase64) {
+    editorFileInput = fileInput;
+    editorOriginalBase64 = imageBase64;
+    editorRotation = 0;
+    editorCrop = null;
+    currentCrop = null;
+    document.getElementById('crop-overlay').style.display = 'none';
+    document.getElementById('editor-status').textContent = '';
+
+    const img = new Image();
+    img.onload = function() {
+      editorImage = img;
+      let w = img.width;
+      let h = img.height;
+      const maxW = 600;
+      if (w > maxW) {
+        h = h * maxW / w;
+        w = maxW;
+      }
+      editorCanvas.width = w;
+      editorCanvas.height = h;
+      drawEditorImage();
+      document.getElementById('image-editor-modal').style.display = 'flex';
+    };
+    img.onerror = function() {
+      alert('画像の読み込みに失敗しました。');
+    };
+    img.src = imageBase64;
+  }
+
+  function drawEditorImage() {
+    if (!editorImage) return;
+    const ctx = editorCtx;
+    const canvas = editorCanvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.rotate(editorRotation * Math.PI / 180);
+    if (editorCrop) {
+      const {x, y, w, h} = editorCrop;
+      const scaleX = canvas.width / w;
+      const scaleY = canvas.height / h;
+      ctx.drawImage(editorImage, x, y, w, h, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+    } else {
+      const imgW = editorImage.width;
+      const imgH = editorImage.height;
+      const canvasW = canvas.width;
+      const canvasH = canvas.height;
+      const scale = Math.min(canvasW/imgW, canvasH/imgH);
+      const dw = imgW * scale;
+      const dh = imgH * scale;
+      ctx.drawImage(editorImage, -dw/2, -dh/2, dw, dh);
+    }
+    ctx.restore();
+  }
+
+  function onCropStart(e) {
+    e.preventDefault();
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (editorCanvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (editorCanvas.height / rect.height);
+    isDragging = true;
+    dragStart = {x, y};
+    currentCrop = {x, y, w: 0, h: 0};
+    document.getElementById('crop-overlay').style.display = 'block';
+  }
+
+  function onCropMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (editorCanvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (editorCanvas.height / rect.height);
+    updateCrop(x, y);
+  }
+
+  function onCropEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    if (currentCrop && currentCrop.w > 5 && currentCrop.h > 5) {
+      editorCrop = {...currentCrop};
+      document.getElementById('editor-status').textContent = 'トリミング適用中（確定ボタンで反映）';
+    } else {
+      editorCrop = null;
+      document.getElementById('crop-overlay').style.display = 'none';
+      document.getElementById('editor-status').textContent = '';
+    }
+    drawEditorImage();
+  }
+
+  function onCropStartTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousedown', {clientX: touch.clientX, clientY: touch.clientY});
+    onCropStart(mouseEvent);
+  }
+  function onCropMoveTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousemove', {clientX: touch.clientX, clientY: touch.clientY});
+    onCropMove(mouseEvent);
+  }
+
+  function updateCrop(x, y) {
+    const {x: sx, y: sy} = dragStart;
+    let left = Math.min(sx, x);
+    let top = Math.min(sy, y);
+    let right = Math.max(sx, x);
+    let bottom = Math.max(sy, y);
+    left = Math.max(0, left);
+    top = Math.max(0, top);
+    right = Math.min(editorCanvas.width, right);
+    bottom = Math.min(editorCanvas.height, bottom);
+    currentCrop = {x: left, y: top, w: right - left, h: bottom - top};
+    const overlay = document.getElementById('crop-overlay');
+    overlay.style.display = 'block';
+    overlay.style.left = left + 'px';
+    overlay.style.top = top + 'px';
+    overlay.style.width = (right - left) + 'px';
+    overlay.style.height = (bottom - top) + 'px';
+  }
+
+  function resetCrop() {
+    editorCrop = null;
+    currentCrop = null;
+    document.getElementById('crop-overlay').style.display = 'none';
+    document.getElementById('editor-status').textContent = '';
+    drawEditorImage();
+  }
+
+  function rotateImage(degrees) {
+    editorRotation = (editorRotation + degrees) % 360;
+    drawEditorImage();
+    document.getElementById('editor-status').textContent = '回転: ' + editorRotation + '°';
+  }
+
+  function confirmEditor() {
+    if (!editorImage) return;
+    const dataUrl = editorCanvas.toDataURL('image/webp', 0.92);
+    if (editorFileInput) {
+      editorFileInput.dataset.editedBase64 = dataUrl;
+      editorFileInput.value = '';
+    }
+    closeEditorModal();
+    document.getElementById('editor-status').textContent = '✅ 編集完了！';
+  }
+
+  function closeEditorModal() {
+    document.getElementById('image-editor-modal').style.display = 'none';
+    editorImage = null;
+    editorFileInput = null;
+    editorCrop = null;
+    currentCrop = null;
+    document.getElementById('crop-overlay').style.display = 'none';
+    document.getElementById('editor-status').textContent = '';
+    editorRotation = 0;
+  }
+
+  function handleFileSelect(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function(e) {
+      openEditorModal(input, e.target.result);
+    };
+    reader.onerror = function() {
+      alert('ファイル読み込みエラー');
+    };
+  }
+
+  // 編集済みBase64を優先するラッパー関数
+  async function getImageBase64(inputElement, maxWidth = 800, quality = 0.7) {
+    if (inputElement.dataset && inputElement.dataset.editedBase64) {
+      return inputElement.dataset.editedBase64;
+    }
+    if (inputElement.files && inputElement.files[0]) {
+      return await fileToBase64(inputElement.files[0], maxWidth, quality);
+    }
+    return '';
+  }
+
+  // 編集モーダルの「確定」ボタンにイベントをバインド
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('editor-confirm-btn').addEventListener('click', confirmEditor);
+    initEditor();
+  });
+    
 // ★★★ クーポン発行関数（修正） ★★★
 async function publishCoupon() {
   const code = document.getElementById('coupon-code').value.trim();
@@ -2914,7 +3129,7 @@ function addGradeForm(data = {}) {
       <input type="number" placeholder="価格CR" class="g-price" value="${data.price || ''}" style="width:30%;">
       <input type="text" placeholder="説明" class="g-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
       <input type="hidden" class="g-existing-img" value="${data.imgUrl || ''}">
-      <input type="file" class="g-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <input type="file" class="g-img" accept="image/*" style="margin-top:5px; width:70%;" onchange="handleFileSelect(this)">
       <button type="button" class="btn btn-danger" onclick="this.closest('.grade-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
     </div>
   `);
@@ -2926,7 +3141,7 @@ function addGradeForm(data = {}) {
       <input type="text" placeholder="色名" class="cl-name" value="${data.colorName || ''}" style="width:40%;">
       <input type="number" placeholder="追加価格CR" class="cl-price" value="${data.price || ''}" style="width:30%;">
       <input type="hidden" class="cl-existing-img" value="${data.imgUrl || ''}">
-      <input type="file" class="cl-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <input type="file" class="cl-img" accept="image/*" style="margin-top:5px; width:70%;" onchange="handleFileSelect(this)">
       <button type="button" class="btn btn-danger" onclick="this.closest('.color-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
     </div>
   `);
@@ -2939,7 +3154,7 @@ function addGradeForm(data = {}) {
       <input type="number" placeholder="価格CR" class="op-price" value="${data.price || ''}" style="width:30%;">
       <input type="text" placeholder="説明" class="op-desc" value="${data.description || ''}" style="width:90%; margin-top:5px;">
       <input type="hidden" class="op-existing-img" value="${data.imgUrl || ''}">
-      <input type="file" class="op-img" accept="image/*" style="margin-top:5px; width:70%;">
+      <input type="file" class="op-img" accept="image/*" style="margin-top:5px; width:70%;" onchange="handleFileSelect(this)">
       <button type="button" class="btn btn-danger" onclick="this.closest('.option-item').remove()" style="margin-left:5px; padding:2px 8px; font-size:0.8rem;">削除</button>
     </div>
   `);
@@ -3033,8 +3248,8 @@ function addGradeForm(data = {}) {
     twitterId: twitterId, // ← 正規化したものを使用
     customLink: document.getElementById('m-link').value,
     cpmId: document.getElementById('m-cpmid').value,
-    iconBase64: await fileToBase64(document.getElementById('m-icon').files[0]),
-    headerBase64: await fileToBase64(document.getElementById('m-header').files[0])
+    iconBase64: await getImageBase64(document.getElementById('m-icon')),
+headerBase64: await getImageBase64(document.getElementById('m-header'))
   };
   const res = await callGasApi('saveMaker', payload);
   if (res) {
@@ -3050,37 +3265,38 @@ function addGradeForm(data = {}) {
 
       const grades = [];
       for (let el of document.querySelectorAll('.grade-item')) {
-        const file = el.querySelector('.g-img').files[0];
-        grades.push({
-          gradeName: el.querySelector('.g-name').value,
-          price: el.querySelector('.g-price').value,
-          description: el.querySelector('.g-desc').value,
-          imgBase64: file ? await fileToBase64(file) : '',
-          imgUrl: el.querySelector('.g-existing-img') ? el.querySelector('.g-existing-img').value : ''
-        });
+        const imgInput = el.querySelector('.g-img');
+grades.push({
+  gradeName: el.querySelector('.g-name').value,
+  price: el.querySelector('.g-price').value,
+  description: el.querySelector('.g-desc').value,
+  imgBase64: await getImageBase64(imgInput),
+  imgUrl: el.querySelector('.g-existing-img') ? el.querySelector('.g-existing-img').value : ''
+});
       }
 
       const colors = [];
       for (let el of document.querySelectorAll('.color-item')) {
-        const file = el.querySelector('.cl-img').files[0];
-        colors.push({
-          colorName: el.querySelector('.cl-name').value,
-          price: el.querySelector('.cl-price').value,
-          imgBase64: file ? await fileToBase64(file) : '',
-          imgUrl: el.querySelector('.cl-existing-img') ? el.querySelector('.cl-existing-img').value : ''
-        });
+        const imgInput = el.querySelector('.cl-img');
+colors.push({
+  colorName: el.querySelector('.cl-name').value,
+  price: el.querySelector('.cl-price').value,
+  imgBase64: await getImageBase64(imgInput),
+  imgUrl: el.querySelector('.cl-existing-img') ? el.querySelector('.cl-existing-img').value : ''
+});
+
       }
 
       const options = [];
       for (let el of document.querySelectorAll('.option-item')) {
-        const file = el.querySelector('.op-img').files[0];
-        options.push({
-          optionName: el.querySelector('.op-name').value,
-          price: el.querySelector('.op-price').value,
-          description: el.querySelector('.op-desc').value,
-          imgBase64: file ? await fileToBase64(file) : '',
-          imgUrl: el.querySelector('.op-existing-img') ? el.querySelector('.op-existing-img').value : ''
-        });
+        const imgInput = el.querySelector('.op-img');
+options.push({
+  optionName: el.querySelector('.op-name').value,
+  price: el.querySelector('.op-price').value,
+  description: el.querySelector('.op-desc').value,
+  imgBase64: await getImageBase64(imgInput),
+  imgUrl: el.querySelector('.op-existing-img') ? el.querySelector('.op-existing-img').value : ''
+});
       }
 
       const payload = {
@@ -3095,10 +3311,10 @@ function addGradeForm(data = {}) {
         contactType: document.getElementById('c-contact-type').value,
         contactDetail: document.getElementById('c-contact-detail').value,
         link: document.getElementById('c-link').value,  // ★ 追加
-        img1Base64: await fileToBase64(document.getElementById('c-img1').files[0]),
-        img2Base64: await fileToBase64(document.getElementById('c-img2').files[0]),
-        img3Base64: await fileToBase64(document.getElementById('c-img3').files[0]),
-        img4Base64: await fileToBase64(document.getElementById('c-img4').files[0]),
+        img1Base64: await getImageBase64(document.getElementById('c-img1')),
+img2Base64: await getImageBase64(document.getElementById('c-img2')),
+img3Base64: await getImageBase64(document.getElementById('c-img3')),
+img4Base64: await getImageBase64(document.getElementById('c-img4')),
         grades: grades, colors: colors, options: options
       };
 
@@ -3343,5 +3559,27 @@ loadAnnouncement(); // ★ 追加
     </div>
   </div>
 </div>
+
+    <!-- ===== 画像編集モーダル（トリミング・回転） ===== -->
+  <div id="image-editor-modal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <h3>✂️ 画像編集（トリミング / 回転）</h3>
+      <div style="position: relative; display: inline-block; margin: 10px auto; text-align: center;">
+        <canvas id="editor-canvas" style="max-width: 100%; border: 1px solid #444; background: #000;"></canvas>
+        <!-- トリミング用のドラッグ矩形 -->
+        <div id="crop-overlay" style="position: absolute; border: 2px dashed #00d2ff; background: rgba(0,210,255,0.1); display: none; pointer-events: none;"></div>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap;">
+        <button class="btn" onclick="rotateImage(-90)">↺ 左回転</button>
+        <button class="btn" onclick="rotateImage(90)">↻ 右回転</button>
+        <button class="btn btn-secondary" onclick="resetCrop()">トリミング解除</button>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+        <button class="btn" id="editor-confirm-btn">✅ 確定</button>
+        <button class="btn btn-secondary" onclick="closeEditorModal()">キャンセル</button>
+      </div>
+      <div id="editor-status" style="font-size: 0.85rem; color: #aaa; margin-top: 10px;"></div>
+    </div>
+  </div>
 </body>
 </html>
