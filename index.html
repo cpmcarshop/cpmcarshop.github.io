@@ -2807,13 +2807,13 @@ function initEditor() {
 
   // マウスイベント
   editorCanvas.addEventListener('mousedown', onEditorMouseDown);
-  window.addEventListener('mousemove', onEditorMouseMove);
-  window.addEventListener('mouseup', onEditorMouseUp);
+  editorCanvas.addEventListener('mousemove', onEditorMouseMove);
+  editorCanvas.addEventListener('mouseup', onEditorMouseUp);
 
   // タッチイベント
   editorCanvas.addEventListener('touchstart', onEditorTouchStart, { passive: false });
-  window.addEventListener('touchmove', onEditorTouchMove, { passive: false });
-  window.addEventListener('touchend', onEditorTouchUp, { passive: false });
+  editorCanvas.addEventListener('touchmove', onEditorTouchMove, { passive: false });
+  editorCanvas.addEventListener('touchend', onEditorTouchUp, { passive: false });
 }
 
 // ---- 座標変換 ----
