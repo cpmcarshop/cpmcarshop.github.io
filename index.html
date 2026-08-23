@@ -2858,12 +2858,12 @@ function initEditor() {
   // マウスイベント
   editorCanvas.addEventListener('mousedown', onEditorMouseDown);
   editorCanvas.addEventListener('mousemove', onEditorMouseMove);
-  editorCanvas.addEventListener('mouseup', onEditorMouseUp);
+  window.addEventListener('mouseup', onEditorMouseUp);   // ★ ウィンドウに変更
 
   // タッチイベント
   editorCanvas.addEventListener('touchstart', onEditorTouchStart, { passive: false });
   editorCanvas.addEventListener('touchmove', onEditorTouchMove, { passive: false });
-  editorCanvas.addEventListener('touchend', onEditorTouchUp, { passive: false });
+  window.addEventListener('touchend', onEditorTouchUp, { passive: false }); // ★ ウィンドウに変更
 }
 
 // ---- 座標変換 ----
@@ -3158,19 +3158,36 @@ function handleDrag(mx, my) {
   }
 
   // 画像の範囲内に収める（キャンバス全体ではなく、画像表示領域内）
-  const scale = getDisplayScale();
-  const imgW = editorImage.width * scale;
-  const imgH = editorImage.height * scale;
-  const offsetX = (editorCanvas.width - imgW) / 2;
-  const offsetY = (editorCanvas.height - imgH) / 2;
+  // 画像の範囲内に収める
+const scale = getDisplayScale();
+const imgW = editorImage.width * scale;
+const imgH = editorImage.height * scale;
+const offsetX = (editorCanvas.width - imgW) / 2;
+const offsetY = (editorCanvas.height - imgH) / 2;
 
-  // 矩形が画像領域からはみ出ないように制限
-  if (x < offsetX) { w -= (offsetX - x); x = offsetX; }
-  if (y < offsetY) { h -= (offsetY - y); y = offsetY; }
-  if (x + w > offsetX + imgW) { w = offsetX + imgW - x; }
-  if (y + h > offsetY + imgH) { h = offsetY + imgH - y; }
-  if (w < minSize) w = minSize;
-  if (h < minSize) h = minSize;
+// ★ 矩形が画像領域内に収まるように位置を調整する（サイズは変えない）
+if (x < offsetX) {
+  x = offsetX;
+}
+if (y < offsetY) {
+  y = offsetY;
+}
+if (x + w > offsetX + imgW) {
+  x = offsetX + imgW - w;
+}
+if (y + h > offsetY + imgH) {
+  y = offsetY + imgH - h;
+}
+
+// 最小サイズの保証（もし最小サイズより小さくなったら強制的に戻す）
+if (w < minSize) w = minSize;
+if (h < minSize) h = minSize;
+
+// 最小サイズ適用後に再度位置を微調整（必要に応じて）
+if (x < offsetX) x = offsetX;
+if (y < offsetY) y = offsetY;
+if (x + w > offsetX + imgW) x = offsetX + imgW - w;
+if (y + h > offsetY + imgH) y = offsetY + imgH - h;
 
   editorCrop = { x, y, w, h };
   drawEditorImage();
