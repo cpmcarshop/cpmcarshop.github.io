@@ -2113,7 +2113,7 @@ async function openCarDetail(carId) {
           <div class="carousel-dots"></div>
         </div>
 
-        <p>${car.description}</p>
+        <p style="white-space: pre-wrap;">${car.description}</p>
 
          <!-- ★★★ ここにリンク表示を追加 ★★★ -->
   ${car.link ? `<p><a href="${car.link}" target="_blank" rel="noopener" style="color:var(--main-color); text-decoration:underline;">関連リンク</a></p>` : ''}
