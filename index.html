@@ -2556,7 +2556,7 @@ window._currentMaker = maker;
 
   // ★ 自社車両一覧を先に取得（セレクトボックス用）
   const myCars = await callGasApi('getCars', { makerId: maker.makerId });
-  const enrichedCars = await enrichCarsWithMakerIcons(cars);
+  const enrichedCars = await enrichCarsWithMakerIcons(myCars);
 
 
   // statusArea.innerHTML 内にCPM IDを追加
@@ -2649,7 +2649,7 @@ if (orderRes && orderRes.orders.length > 0) {
   orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
 }
   // 自社車両（既存）
-  renderCarGrid('my-cars-grid', myCars || [], true);
+  renderCarGrid('my-cars-grid', enrichedCars || [], true);
 
   // クーポン・セール一覧読み込み
   loadMyCoupons();
