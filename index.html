@@ -3172,7 +3172,6 @@ function confirmEditor() {
     return;
   }
 
-  // キャンバス上の矩形を元画像座標に変換
   const { x, y, w, h } = editorCrop;
   const scale = getDisplayScale();
   const imgW = editorImage.width;
@@ -3206,10 +3205,15 @@ function confirmEditor() {
   const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.92);
 
   if (editorFileInput) {
-    editorFileInput.dataset.editedBase64 = croppedDataUrl;
-    editorFileInput.value = ''; // ファイル選択をクリア（表示は「選択されていません」になる）
+    // ★ 元のファイル名を保存
+    const originalFileName = editorFileInput.files && editorFileInput.files[0]
+      ? editorFileInput.files[0].name
+      : '（ファイル名不明）';
 
-    // ★★★ 編集状態を表示 ★★★
+    editorFileInput.dataset.editedBase64 = croppedDataUrl;
+    editorFileInput.value = ''; // ブラウザ表示は「選択されていません」になる
+
+    // ★ ファイル名を表示するラベルを追加/更新
     const parent = editorFileInput.parentNode;
     let statusSpan = parent.querySelector('.file-status');
     if (!statusSpan) {
@@ -3217,16 +3221,16 @@ function confirmEditor() {
       statusSpan.className = 'file-status';
       parent.appendChild(statusSpan);
     }
-    statusSpan.textContent = ' ✅ 編集済み（再選択で上書き）';
+    statusSpan.textContent = ` ✅ 編集済み（元ファイル: ${originalFileName}）`;
     statusSpan.style.color = '#4caf50';
-    statusSpan.style.marginLeft = '5px';
+    statusSpan.style.marginLeft = '8px';
     statusSpan.style.fontSize = '0.9rem';
+    statusSpan.style.fontWeight = 'bold';
   }
 
   closeEditorModal();
   document.getElementById('editor-status').textContent = '✅ 編集完了！';
 }
-
 // ---- その他ユーティリティ ----
 function resetCrop() {
   if (!editorImage) return;
@@ -3292,18 +3296,23 @@ function closeEditorModal() {
   document.getElementById('editor-status').textContent = '';
 }
 
-// ---- ファイル選択ハンドラ（既存のものを上書き） ----
-function handleFileSelect(input) {
-  // 編集状態をリセット（新しくファイルが選択されたら）
+// ---- ファイル選択ハンドラ（既存のものを上書き） ----function handleFileSelect(input) {
+  // 既存のステータスラベルをリセット（新しくファイルが選択されたら）
   const parent = input.parentNode;
   let statusSpan = parent.querySelector('.file-status');
-  if (!statusSpan) {
+  if (statusSpan) {
+    // 編集状態をクリア
+    statusSpan.textContent = ' ファイル読み込み中...';
+    statusSpan.style.color = '#ffd700';
+  } else {
+    // まだラベルがなければ作成
     statusSpan = document.createElement('span');
     statusSpan.className = 'file-status';
     parent.appendChild(statusSpan);
+    statusSpan.textContent = ' ファイル読み込み中...';
+    statusSpan.style.color = '#ffd700';
+    statusSpan.style.marginLeft = '8px';
   }
-  statusSpan.textContent = ' ファイル読み込み中...';
-  statusSpan.style.color = '#ffd700';
 
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
