@@ -3296,7 +3296,7 @@ function closeEditorModal() {
   document.getElementById('editor-status').textContent = '';
 }
 
-// ---- ファイル選択ハンドラ（既存のものを上書き） ----function handleFileSelect(input) {
+function handleFileSelect(input) {
   // 既存のステータスラベルをリセット（新しくファイルが選択されたら）
   const parent = input.parentNode;
   let statusSpan = parent.querySelector('.file-status');
