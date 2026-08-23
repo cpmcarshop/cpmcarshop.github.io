@@ -3302,13 +3302,27 @@ function confirmEditor() {
 function resetCrop() {
   if (!editorImage) return;
   const scale = getDisplayScale();
-  const imgW = editorImage.width * scale;
-  const imgH = editorImage.height * scale;
-  const offsetX = (editorCanvas.width - imgW) / 2;
-  const offsetY = (editorCanvas.height - imgH) / 2;
-  editorCrop = { x: offsetX, y: offsetY, w: imgW, h: imgH };
+  
+  // ★ 回転後の画像の表示サイズを正しく計算
+  let displayW, displayH;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  
+  if (editorRotation === 0 || editorRotation === 180) {
+    displayW = imgW * scale;
+    displayH = imgH * scale;
+  } else {
+    // 90度 / 270度 回転時は縦横が入れ替わる
+    displayW = imgH * scale;
+    displayH = imgW * scale;
+  }
+  
+  const offsetX = (canvasW - displayW) / 2;
+  const offsetY = (canvasH - displayH) / 2;
+  editorCrop = { x: offsetX, y: offsetY, w: displayW, h: displayH };
   drawEditorImage();
-  document.getElementById('editor-status').textContent = 'トリミング解除';
 }
 
 function rotateImage(degrees) {
