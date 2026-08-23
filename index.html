@@ -642,7 +642,6 @@
   z-index: 20;
   cursor: pointer;
   box-shadow: 0 0 4px rgba(0,0,0,0.5);
-  display: none;
 }
 .crop-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
 .crop-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
@@ -652,6 +651,16 @@
 .crop-handle.s { bottom: -5px; left: 50%; margin-left: -5px; cursor: s-resize; }
 .crop-handle.w { top: 50%; left: -5px; margin-top: -5px; cursor: w-resize; }
 .crop-handle.e { top: 50%; right: -5px; margin-top: -5px; cursor: e-resize; }
+    #crop-overlay {
+  position: absolute;
+  border: 2px dashed #00d2ff;
+  background: rgba(0,210,255,0.1);
+  display: none;
+  pointer-events: none;  /* 枠自体はクリック透過 */
+}
+.crop-handle {
+  pointer-events: auto;  /* ハンドルだけクリック可能に */
+}
   </style>
 </head>
 <body>
@@ -2950,32 +2959,43 @@ function endFrameDrag(e) {
     };
     img.src = imageBase64;
   }
+function drawEditorImage() {
+  if (!editorImage) return;
+  const ctx = editorCtx;
+  const canvas = editorCanvas;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.rotate(editorRotation * Math.PI / 180);
 
-  function drawEditorImage() {
-    if (!editorImage) return;
-    const ctx = editorCtx;
-    const canvas = editorCanvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2);
-    ctx.rotate(editorRotation * Math.PI / 180);
-    if (editorCrop) {
-      const {x, y, w, h} = editorCrop;
-      const scaleX = canvas.width / w;
-      const scaleY = canvas.height / h;
-      ctx.drawImage(editorImage, x, y, w, h, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
-    } else {
-      const imgW = editorImage.width;
-      const imgH = editorImage.height;
-      const canvasW = canvas.width;
-      const canvasH = canvas.height;
-      const scale = Math.min(canvasW/imgW, canvasH/imgH);
-      const dw = imgW * scale;
-      const dh = imgH * scale;
-      ctx.drawImage(editorImage, -dw/2, -dh/2, dw, dh);
-    }
-    ctx.restore();
+  // 回転後の画像全体が収まるスケールを計算
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  const rad = editorRotation * Math.PI / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const rotatedW = imgW * cos + imgH * sin;
+  const rotatedH = imgW * sin + imgH * cos;
+
+  // キャンバスサイズに合わせる（はみ出さないように縮小）
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
+  const scale = Math.min(canvasW / rotatedW, canvasH / rotatedH, 1); // 1以上には拡大しない
+
+  const drawW = imgW * scale;
+  const drawH = imgH * scale;
+
+  if (editorCrop) {
+    const {x, y, w, h} = editorCrop;
+    // トリミング範囲を描画（元画像の座標をそのまま使う）
+    const scaleX = drawW / w;
+    const scaleY = drawH / h;
+    ctx.drawImage(editorImage, x, y, w, h, -drawW/2, -drawH/2, drawW, drawH);
+  } else {
+    ctx.drawImage(editorImage, -drawW/2, -drawH/2, drawW, drawH);
   }
+  ctx.restore();
+}
 
     function onCropMove(e) {
     if (!isDragging) return;
