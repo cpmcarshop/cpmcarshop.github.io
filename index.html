@@ -3110,11 +3110,10 @@ function handleDrag(mx, my) {
   const dx = mx - dragStartMouse.x;
   const dy = my - dragStartMouse.y;
 
-  // アスペクト比ロック（変更なし）
   const lockAspect = editorAspectRatio !== null;
   const ratio = lockAspect ? editorAspectRatio.w / editorAspectRatio.h : null;
 
-  // 各ハンドルで更新（変更なし）
+  // 各ハンドルで更新
   switch (dragType) {
     case 'move': x += dx; y += dy; break;
     case 'nw': x += dx; y += dy; w -= dx; h -= dy; break;
@@ -3128,39 +3127,79 @@ function handleDrag(mx, my) {
     default: return;
   }
 
-  // 最小サイズ
   const minSize = 10;
   if (w < minSize) w = minSize;
   if (h < minSize) h = minSize;
 
-  // アスペクト比ロック（変更なし）
+  // ★ 画像表示領域を取得
+  const rect = getImageDisplayRect();
+  if (!rect) return;
+  const { x: offsetX, y: offsetY, w: imgW, h: imgH } = rect;
+
+  // ★ ハンドルの種類に応じて矩形を画像領域内に制限（反対側は固定）
+  switch (dragType) {
+    case 'move':
+      // 移動は位置だけ制限
+      if (x < offsetX) x = offsetX;
+      if (y < offsetY) y = offsetY;
+      if (x + w > offsetX + imgW) x = offsetX + imgW - w;
+      if (y + h > offsetY + imgH) y = offsetY + imgH - h;
+      break;
+
+    case 'e':
+      if (x + w > offsetX + imgW) w = offsetX + imgW - x;
+      break;
+    case 'w':
+      if (x < offsetX) { w += x - offsetX; x = offsetX; }
+      break;
+    case 's':
+      if (y + h > offsetY + imgH) h = offsetY + imgH - y;
+      break;
+    case 'n':
+      if (y < offsetY) { h += y - offsetY; y = offsetY; }
+      break;
+
+    case 'ne':
+      if (y < offsetY) { h += y - offsetY; y = offsetY; }
+      if (x + w > offsetX + imgW) w = offsetX + imgW - x;
+      break;
+    case 'nw':
+      if (y < offsetY) { h += y - offsetY; y = offsetY; }
+      if (x < offsetX) { w += x - offsetX; x = offsetX; }
+      break;
+    case 'se':
+      if (y + h > offsetY + imgH) h = offsetY + imgH - y;
+      if (x + w > offsetX + imgW) w = offsetX + imgW - x;
+      break;
+    case 'sw':
+      if (y + h > offsetY + imgH) h = offsetY + imgH - y;
+      if (x < offsetX) { w += x - offsetX; x = offsetX; }
+      break;
+  }
+
+  // ★ アスペクト比ロック（制限後に再適用）
   if (lockAspect) {
     const centerX = x + w / 2;
     const centerY = y + h / 2;
     let newW = w;
     let newH = w / ratio;
     if (newH < minSize) { newH = minSize; newW = newH * ratio; }
+    // 中心を保ちながらアスペクト比を適用
     x = centerX - newW / 2;
     y = centerY - newH / 2;
     w = newW;
     h = newH;
+
+    // 画像領域からはみ出さないように位置を調整（サイズは変えない）
+    if (x < offsetX) x = offsetX;
+    if (y < offsetY) y = offsetY;
+    if (x + w > offsetX + imgW) x = offsetX + imgW - w;
+    if (y + h > offsetY + imgH) y = offsetY + imgH - h;
   }
-
-  // ★★★ ここから修正 ★★★
-  const rect = getImageDisplayRect();
-  if (!rect) return;
-  const { x: offsetX, y: offsetY, w: imgW, h: imgH } = rect;
-
-  // 矩形が画像領域からはみ出ないように位置を調整（サイズは変えない）
-  if (x < offsetX) x = offsetX;
-  if (y < offsetY) y = offsetY;
-  if (x + w > offsetX + imgW) x = offsetX + imgW - w;
-  if (y + h > offsetY + imgH) y = offsetY + imgH - h;
 
   editorCrop = { x, y, w, h };
   drawEditorImage();
 }
-
 // ---- モーダル開く ----
 function openEditorModal(fileInput, imageBase64) {
   editorFileInput = fileInput;
