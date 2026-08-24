@@ -2849,7 +2849,7 @@ let dragStartMouse = { x: 0, y: 0 };
 let dragStartCrop = { x: 0, y: 0, w: 0, h: 0 };
 
 // ハンドルのサイズ（ピクセル）
-const HANDLE_SIZE = 12;
+const HANDLE_SIZE = 24;
 
 function initEditor() {
   editorCanvas = document.getElementById('editor-canvas');
@@ -3023,7 +3023,7 @@ function drawEditorImage() {
 function getHandleType(mx, my) {
   if (!editorCrop) return null;
   const { x, y, w, h } = editorCrop;
-  const half = HANDLE_SIZE / 2 + 4;
+  const half = HANDLE_SIZE / 2 + 10; 
   const handles = [
     { type: 'nw', cx: x, cy: y },
     { type: 'ne', cx: x + w, cy: y },
