@@ -2866,6 +2866,30 @@ function initEditor() {
   window.addEventListener('touchend', onEditorTouchUp, { passive: false }); // ★ ウィンドウに変更
 }
 
+    // ★ 回転後の画像表示領域（位置とサイズ）を取得
+function getImageDisplayRect() {
+  if (!editorImage) return null;
+  const canvasW = editorCanvas.width;
+  const canvasH = editorCanvas.height;
+  const imgW = editorImage.width;
+  const imgH = editorImage.height;
+  const scale = getDisplayScale();
+  
+  let displayW, displayH;
+  // 回転角度に応じて表示サイズを計算
+  if (editorRotation === 0 || editorRotation === 180) {
+    displayW = imgW * scale;
+    displayH = imgH * scale;
+  } else {
+    // 90度 / 270度 回転時は縦横が入れ替わる
+    displayW = imgH * scale;
+    displayH = imgW * scale;
+  }
+  
+  const offsetX = (canvasW - displayW) / 2;
+  const offsetY = (canvasH - displayH) / 2;
+  return { x: offsetX, y: offsetY, w: displayW, h: displayH };
+}
 // ---- 座標変換 ----
 function getCanvasCoords(clientX, clientY) {
   const rect = editorCanvas.getBoundingClientRect();
@@ -3086,52 +3110,22 @@ function handleDrag(mx, my) {
   const dx = mx - dragStartMouse.x;
   const dy = my - dragStartMouse.y;
 
-  // アスペクト比ロック
+  // アスペクト比ロック（変更なし）
   const lockAspect = editorAspectRatio !== null;
   const ratio = lockAspect ? editorAspectRatio.w / editorAspectRatio.h : null;
 
-  // 各ハンドルで更新
+  // 各ハンドルで更新（変更なし）
   switch (dragType) {
-    case 'move':
-      x += dx;
-      y += dy;
-      break;
-    case 'nw':
-      x += dx;
-      y += dy;
-      w -= dx;
-      h -= dy;
-      break;
-    case 'ne':
-      y += dy;
-      w += dx;
-      h -= dy;
-      break;
-    case 'sw':
-      x += dx;
-      w -= dx;
-      h += dy;
-      break;
-    case 'se':
-      w += dx;
-      h += dy;
-      break;
-    case 'n':
-      y += dy;
-      h -= dy;
-      break;
-    case 's':
-      h += dy;
-      break;
-    case 'w':
-      x += dx;
-      w -= dx;
-      break;
-    case 'e':
-      w += dx;
-      break;
-    default:
-      return;
+    case 'move': x += dx; y += dy; break;
+    case 'nw': x += dx; y += dy; w -= dx; h -= dy; break;
+    case 'ne': y += dy; w += dx; h -= dy; break;
+    case 'sw': x += dx; w -= dx; h += dy; break;
+    case 'se': w += dx; h += dy; break;
+    case 'n': y += dy; h -= dy; break;
+    case 's': h += dy; break;
+    case 'w': x += dx; w -= dx; break;
+    case 'e': w += dx; break;
+    default: return;
   }
 
   // 最小サイズ
@@ -3139,55 +3133,29 @@ function handleDrag(mx, my) {
   if (w < minSize) w = minSize;
   if (h < minSize) h = minSize;
 
-  // アスペクト比ロック（リサイズ後）
+  // アスペクト比ロック（変更なし）
   if (lockAspect) {
-    // 現在の中心を維持しながら縦横比を調整
     const centerX = x + w / 2;
     const centerY = y + h / 2;
     let newW = w;
     let newH = w / ratio;
-    if (newH < minSize) {
-      newH = minSize;
-      newW = newH * ratio;
-    }
-    // 中心を保つ
+    if (newH < minSize) { newH = minSize; newW = newH * ratio; }
     x = centerX - newW / 2;
     y = centerY - newH / 2;
     w = newW;
     h = newH;
   }
 
-  // 画像の範囲内に収める（キャンバス全体ではなく、画像表示領域内）
-  // 画像の範囲内に収める
-const scale = getDisplayScale();
-const imgW = editorImage.width * scale;
-const imgH = editorImage.height * scale;
-const offsetX = (editorCanvas.width - imgW) / 2;
-const offsetY = (editorCanvas.height - imgH) / 2;
+  // ★★★ ここから修正 ★★★
+  const rect = getImageDisplayRect();
+  if (!rect) return;
+  const { x: offsetX, y: offsetY, w: imgW, h: imgH } = rect;
 
-// ★ 矩形が画像領域内に収まるように位置を調整する（サイズは変えない）
-if (x < offsetX) {
-  x = offsetX;
-}
-if (y < offsetY) {
-  y = offsetY;
-}
-if (x + w > offsetX + imgW) {
-  x = offsetX + imgW - w;
-}
-if (y + h > offsetY + imgH) {
-  y = offsetY + imgH - h;
-}
-
-// 最小サイズの保証（もし最小サイズより小さくなったら強制的に戻す）
-if (w < minSize) w = minSize;
-if (h < minSize) h = minSize;
-
-// 最小サイズ適用後に再度位置を微調整（必要に応じて）
-if (x < offsetX) x = offsetX;
-if (y < offsetY) y = offsetY;
-if (x + w > offsetX + imgW) x = offsetX + imgW - w;
-if (y + h > offsetY + imgH) y = offsetY + imgH - h;
+  // 矩形が画像領域からはみ出ないように位置を調整（サイズは変えない）
+  if (x < offsetX) x = offsetX;
+  if (y < offsetY) y = offsetY;
+  if (x + w > offsetX + imgW) x = offsetX + imgW - w;
+  if (y + h > offsetY + imgH) y = offsetY + imgH - h;
 
   editorCrop = { x, y, w, h };
   drawEditorImage();
@@ -3301,27 +3269,9 @@ function confirmEditor() {
 // ---- その他ユーティリティ ----
 function resetCrop() {
   if (!editorImage) return;
-  const scale = getDisplayScale();
-  
-  // ★ 回転後の画像の表示サイズを正しく計算
-  let displayW, displayH;
-  const canvasW = editorCanvas.width;
-  const canvasH = editorCanvas.height;
-  const imgW = editorImage.width;
-  const imgH = editorImage.height;
-  
-  if (editorRotation === 0 || editorRotation === 180) {
-    displayW = imgW * scale;
-    displayH = imgH * scale;
-  } else {
-    // 90度 / 270度 回転時は縦横が入れ替わる
-    displayW = imgH * scale;
-    displayH = imgW * scale;
-  }
-  
-  const offsetX = (canvasW - displayW) / 2;
-  const offsetY = (canvasH - displayH) / 2;
-  editorCrop = { x: offsetX, y: offsetY, w: displayW, h: displayH };
+  const rect = getImageDisplayRect();
+  if (!rect) return;
+  editorCrop = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
   drawEditorImage();
 }
 
