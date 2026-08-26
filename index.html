@@ -1044,84 +1044,46 @@
       });
     
     onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        window.currentUser = user;
-        
-        // ★★★ 1. ログイン直後は「ユーザー名確認中...」と表示 ★★★
-        document.getElementById('user-display-name').innerText = '認証中...';
-        document.getElementById('auth-btn').innerText = '管理';
-        document.getElementById('mypage-tab').classList.add('is-visible');
-        
-        // ★★★ 2. 常に空文字を送信（Google表示名を絶対に送らない） ★★★
-        const userInfo = await callGasApi('registerUser', { 
-          uid: user.uid, 
-          name: '',   // ← 常に空文字（Google表示名を無視）
-          username: '', // ← 常に空文字（メールアドレスから自動生成しない）
-          email: user.email 
-        });
-        
-        // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
-       // ★★★ 3. 取得結果に応じてヘッダーを更新 ★★★
-if (userInfo && userInfo.name === '') {
-  showUsernameModal(user.uid);
-} else {
-  document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
-}
+  if (user) {
+    window.currentUser = user;
+    document.getElementById('user-display-name').innerText = '認証中...';
+    document.getElementById('auth-btn').innerText = '管理';
+    document.getElementById('mypage-tab').classList.add('is-visible');
 
-// ★★★ TwitterID チェック（追加） ★★★
-// ★★★ TwitterID チェック（修正） ★★★
-const twitterId = userInfo && userInfo.twitterId ? userInfo.twitterId : '';
-if (!twitterId || twitterId === '') {
-  // 既にモーダルが表示されていなければ表示
-  if (document.getElementById('twitter-modal').style.display !== 'flex') {
-    showTwitterModal();
-  }
-} else {
-  window.currentUser.twitterId = twitterId;
-}
-        
-// ★★★ ここに「お知らせ」チェックを追加 ★★★
-// ユーザー名設定モーダルやTwitter IDモーダルが表示されている場合は、それらが閉じられた後に表示するため、
-// 少し遅延して実行（モーダルが閉じるのを待つ）
-// ★★★ お知らせチェック（修正版：確実に両方のモーダルが閉じるのを待つ） ★★★
-// ★★★ お知らせチェック（修正版：確実に両方のモーダルが閉じるのを待つ） ★★★
-setTimeout(() => {
-  // ★ 既存のインターバルをクリア（多重起動防止）
-  if (announcementCheckInterval) {
-    clearInterval(announcementCheckInterval);
-    announcementCheckInterval = null;
-  }
-  
-  const usernameModal = document.getElementById('username-modal');
-  const twitterModal = document.getElementById('twitter-modal');
+    // ★ registerUser を強制更新（キャッシュを無視）
+    const userInfo = await callGasApi('registerUser', {
+      uid: user.uid,
+      name: '',
+      username: '',
+      email: user.email,
+      _t: Date.now()
+    }, true, true); // forceRefresh = true
 
-  // すでに両方閉じているなら即表示
-  if (usernameModal.style.display !== 'flex' && twitterModal.style.display !== 'flex') {
-    fetchAndShowAnnouncements(user.uid);
-    return;
-  }
-
-  // どちらかが開いている場合は、両方閉じるまでポーリング
-  announcementCheckInterval = setInterval(() => {
-    if (usernameModal.style.display !== 'flex' && twitterModal.style.display !== 'flex') {
-      clearInterval(announcementCheckInterval);
-      announcementCheckInterval = null;
-      fetchAndShowAnnouncements(user.uid);
+    // ★ ユーザー名のチェック（モーダル表示のみ）
+    if (userInfo && userInfo.name === '') {
+      showUsernameModal(user.uid);
+    } else {
+      document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
     }
-  }, 300);
-}, 500);
-        
-        setTimeout(async () => {
-          loadMypageData();
-        }, 500);
-        
-      } else {
-        window.currentUser = null;
-        document.getElementById('user-display-name').innerText = '';
-        document.getElementById('auth-btn').innerText = 'ログイン / 登録';
-        document.getElementById('mypage-tab').classList.remove('is-visible');
-      }
-    });
+
+    // ★ Twitter ID のチェック（モーダル表示のみ）
+    const twitterId = userInfo?.twitterId || '';
+    if (!twitterId) {
+      showTwitterModal();
+    } else {
+      window.currentUser.twitterId = twitterId;
+    }
+
+    // ★★★ loadMypageData は呼ばない（マイページタブをクリックしたときに初めて呼ばれる） ★★★
+    // もしも初期表示で何か軽量なデータが必要ならここで取得するが、今回は不要
+
+  } else {
+    window.currentUser = null;
+    document.getElementById('user-display-name').innerText = '';
+    document.getElementById('auth-btn').innerText = 'ログイン / 登録';
+    document.getElementById('mypage-tab').classList.remove('is-visible');
+  }
+});
 </script>
 
   <script>
@@ -1279,15 +1241,18 @@ const apiCache = {};
 const CACHE_TTL = 60000; // 60秒
 let isInitialLoad = true; // 初期ロード中かどうか
 
-async function callGasApi(action, payload = {}, showLoadingFlag = true) {
+async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRefresh = false) {
   const cacheKey = action + JSON.stringify(payload);
   const now = Date.now();
-  
-  if (apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
+
+  // ★ キャッシュを無視すべきアクション or forceRefresh が true ならキャッシュをスキップ
+  const NO_CACHE_ACTIONS = ['registerUser', 'getUserAnnouncements', 'getMakerByUid', 'getMyCoupons'];
+  const skipCache = forceRefresh || NO_CACHE_ACTIONS.includes(action);
+
+  if (!skipCache && apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
     console.log('キャッシュ使用: ' + action);
     return apiCache[cacheKey].data;
   }
-
   if (!isInitialLoad && currentAbortController) {
     currentAbortController.abort();
   }
@@ -1410,7 +1375,6 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
   }
 }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
     // 認証ボタン押下
     document.getElementById('auth-btn').addEventListener('click', () => {
   if (window.currentUser) {
@@ -1420,6 +1384,28 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
     document.getElementById('auth-modal').style.display = 'flex';
   }
 });
+
+    // ★ モーダルが閉じられたときに呼ばれるチェック関数
+function checkAndShowAnnouncements() {
+  const usernameModal = document.getElementById('username-modal');
+  const twitterModal = document.getElementById('twitter-modal');
+  const user = window.currentUser;
+  if (!user) return;
+  // 両方のモーダルが非表示ならお知らせを表示
+  if (usernameModal.style.display !== 'flex' && twitterModal.style.display !== 'flex') {
+    fetchAndShowAnnouncements(user.uid);
+  }
+}
+
+// ★ closeModal を拡張（オリジナルを保持）
+const originalCloseModal = closeModal;
+closeModal = function(id) {
+  originalCloseModal(id);
+  // ユーザー名・Twitterモーダルが閉じられたときにチェック
+  if (id === 'username-modal' || id === 'twitter-modal') {
+    checkAndShowAnnouncements();
+  }
+};
     // Google認証
 
     // メール認証
@@ -1559,6 +1545,8 @@ async function saveTwitterId() {
 }
     function showTwitterModal() {
   const modal = document.getElementById('twitter-modal');
+  if (modal.style.display === 'flex') return;
+
   modal.style.display = 'flex';
   // 背景クリックで閉じないように
   modal.onclick = function(e) {
@@ -1828,6 +1816,7 @@ function resetSearchFilter() {
     // ユーザー名設定モーダルを表示（閉じられないように制御）
 function showUsernameModal(uid) {
   const modal = document.getElementById('username-modal');
+  if (modal.style.display === 'flex') return; 
   modal.style.display = 'flex';
   // 背景クリックで閉じないように
   modal.onclick = function(e) {
