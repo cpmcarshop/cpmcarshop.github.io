@@ -797,6 +797,12 @@
 
     <!-- 5. マイページ・店舗管理タブ -->
     <main id="mypage" class="tab-content">
+      <hr style="border-color: #333; margin: 20px 0;">
+<div id="my-orders-section">
+  <h3>📋 自分の注文ステータス</h3>
+  <button class="btn" onclick="showMyOrders()">注文履歴を表示</button>
+  <div id="my-orders-container" style="margin-top:15px;"></div>
+</div>
       <h2>メーカー＆店舗管理</h2>
       <div id="maker-status-area"></div>
       
@@ -1163,6 +1169,39 @@ async function fetchAndShowAnnouncements(uid) {
   }
 }
 
+    // ★ 新規追加：購入者用注文履歴表示
+async function showMyOrders() {
+  if (!window.currentUser) {
+    alert('ログインしてください。');
+    return;
+  }
+  const container = document.getElementById('my-orders-container');
+  container.innerHTML = '読み込み中...';
+  
+  const result = await callGasApi('getUserOrders', { uid: window.currentUser.uid });
+  if (!result || !result.orders) {
+    container.innerHTML = '<p style="color:#888;">注文履歴の取得に失敗しました。</p>';
+    return;
+  }
+  if (result.orders.length === 0) {
+    container.innerHTML = '<p style="color:#888;">注文履歴はありません。</p>';
+    return;
+  }
+
+  container.innerHTML = result.orders.map(o => {
+    const optionsDisplay = Array.isArray(o.options) ? o.options.join(', ') : 'なし';
+    return `
+      <div class="notif-box">
+        <strong>${o.carName}</strong><br>
+        注文ID: ${o.orderId}<br>
+        グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
+        合計金額: ${Number(o.totalPrice).toLocaleString()} CR<br>
+        ステータス: <strong>${o.status}</strong><br>
+        注文日: ${o.createdAt}
+      </div>
+    `;
+  }).join('');
+}
     // ★ 車両データにメーカーアイコンを追加する関数
 async function enrichCarsWithMakerIcons(cars) {
   if (!cars || cars.length === 0) return cars;
@@ -2626,20 +2665,18 @@ const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.ui
 const orderList = document.getElementById('orders-notification-list');
 if (orderRes && orderRes.orders.length > 0) {
   orderList.innerHTML = orderRes.orders.map(o => {
-    // ★★★★★ ここで o が定義されているので安全 ★★★★★
-    const optionsArray = Array.isArray(o.options) ? o.options : [];
-    const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
-
-    return `
-      <div class="notif-box">
-        <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
-        グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
-        合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
-        ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
-        ${o.status === '納車完了' ? `<br><button class="btn btn-danger" style="margin-top:5px;" onclick="deleteOrder('${o.orderId}')">🗑 削除</button>` : ''}
-      </div>
-    `;
-  }).join('');
+  const optionsArray = Array.isArray(o.options) ? o.options : [];
+  const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
+  return `
+    <div class="notif-box">
+      <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
+      🚗 車種: ${o.carName || '不明'} | グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
+      合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
+      ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
+      ${o.status === '納車完了' ? `<br><button class="btn btn-danger" style="margin-top:5px;" onclick="deleteOrder('${o.orderId}')">🗑 削除</button>` : ''}
+    </div>
+  `;
+}).join('');
 } else {
   orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
 }
