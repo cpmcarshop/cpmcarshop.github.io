@@ -1082,7 +1082,7 @@
 
     // ★★★ loadMypageData は呼ばない（マイページタブをクリックしたときに初めて呼ばれる） ★★★
     // もしも初期表示で何か軽量なデータが必要ならここで取得するが、今回は不要
-
+checkAndShowAnnouncements();
   } else {
     window.currentUser = null;
     document.getElementById('user-display-name').innerText = '';
@@ -1426,14 +1426,11 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
 
     // ★ モーダルが閉じられたときに呼ばれるチェック関数
 function checkAndShowAnnouncements() {
-  const usernameModal = document.getElementById('username-modal');
-  const twitterModal = document.getElementById('twitter-modal');
   const user = window.currentUser;
   if (!user) return;
-  // 両方のモーダルが非表示ならお知らせを表示
-  if (usernameModal.style.display !== 'flex' && twitterModal.style.display !== 'flex') {
-    fetchAndShowAnnouncements(user.uid);
-  }
+  const modal = document.getElementById('announcement-modal');
+  if (modal.style.display === 'flex') return; // 既に表示中なら重複防止
+  fetchAndShowAnnouncements(user.uid);
 }
 
 // ★ closeModal を拡張（オリジナルを保持）
