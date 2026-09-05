@@ -1330,14 +1330,17 @@ if (result && result.banned) {
       timestamp: now
     };
     return result.data;
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      console.log('リクエストキャンセル: ' + action);
-      return null;
-    }
-    console.error('APIエラー (' + action + '):', e.message);
+  // callGasApi 関数内の catch ブロックを以下のように修正
+} catch (e) {
+  if (e.name === 'AbortError') {
+    console.log('リクエストキャンセル: ' + action);
     return null;
-  } finally {
+  }
+  console.error('APIエラー (' + action + '):', e.message);
+  // ★★★ この1行を追加（エラーメッセージを保存） ★★★
+  window._lastApiError = e.message;
+  return null;
+} finally {
     // ★ ローディング表示していた場合のみ非表示
     if (showLoadingFlag) {
       hideLoading();
@@ -2430,50 +2433,72 @@ function calculateTotalPriceWithCoupon() {
 }
 
 async function executePurchase() {
-  if (!confirm("注文をしてもよろしいですか？")) return;
-  if (!window.currentUser) {
-    alert("購入にはログインが必要です");
+  // ★★★ 二重送信防止（連打対策） ★★★
+  if (window._isPurchasing) {
+    alert('処理中です。しばらくお待ちください。');
     return;
   }
+  window._isPurchasing = true;
 
-  // ★★★ 自社購入チェック ★★★
-  const buyerMaker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-  const carMakerId = currentCarDetail.makerId;
-  const developerMakerId = 'MK-92675a74'; // 開発者用ID（このIDなら購入可能）
-
-  if (buyerMaker && buyerMaker.makerId === carMakerId && buyerMaker.makerId !== developerMakerId) {
-    alert('ご自身のメーカーが出品した車両は購入できません。');
-    return;
+  // ボタンを一時的に無効化する（任意、視覚的フィードバック）
+  const buyBtn = document.querySelector('#detail-modal .btn:first-of-type');
+  if (buyBtn) {
+    buyBtn.disabled = true;
+    buyBtn.textContent = '処理中...';
   }
 
+  try {
+    if (!confirm("注文をしてもよろしいですか？")) {
+      window._isPurchasing = false;
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = '購入・注文を送信'; }
+      return;
+    }
+    if (!window.currentUser) {
+      alert("購入にはログインが必要です");
+      window._isPurchasing = false;
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = '購入・注文を送信'; }
+      return;
+    }
 
-  const grade = document.getElementById('buy-grade').value;
-  const color = document.getElementById('buy-color').value;
-  const options = [];
-  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
+    // ★★★ 自社購入チェック（既存） ★★★
+    const buyerMaker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+    const carMakerId = currentCarDetail.makerId;
+    const developerMakerId = 'MK-92675a74';
+    if (buyerMaker && buyerMaker.makerId === carMakerId && buyerMaker.makerId !== developerMakerId) {
+      alert('ご自身のメーカーが出品した車両は購入できません。');
+      window._isPurchasing = false;
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = '購入・注文を送信'; }
+      return;
+    }
 
-  // 合計金額計算
-  if (appliedCouponDetail) {
-    calculateTotalPriceWithCoupon();
-  } else {
-    calculateTotalPrice();
-  }
-  const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
-  if (isNaN(totalPrice) || totalPrice <= 0) {
-    alert("合計金額が正しくありません。");
-    return;
-  }
-  const appliedCouponCode = appliedCouponDetail ? appliedCouponDetail.code : null;
+    // 以下、既存の合計金額計算・注文作成処理...
+    const grade = document.getElementById('buy-grade').value;
+    const color = document.getElementById('buy-color').value;
+    const options = [];
+    document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
 
-  // ★★★ Twitter DM の場合 ★★★
-  if (currentCarDetail.contactType === 'twitter') {
+    if (appliedCouponDetail) {
+      calculateTotalPriceWithCoupon();
+    } else {
+      calculateTotalPrice();
+    }
+    const totalPrice = Number(document.getElementById('buy-total-price').innerText.replace(/,/g, ''));
+    if (isNaN(totalPrice) || totalPrice <= 0) {
+      alert("合計金額が正しくありません。");
+      window._isPurchasing = false;
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = '購入・注文を送信'; }
+      return;
+    }
+    const appliedCouponCode = appliedCouponDetail ? appliedCouponDetail.code : null;
+
+    // ★★★ 注文作成API呼び出し ★★★
     const orderRes = await callGasApi('createOrder', {
       carId: currentCarDetail.carId,
-  makerId: currentCarDetail.makerId,
-  makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-  buyerUid: window.currentUser.uid,
-  buyerName: document.getElementById('user-display-name').innerText || window.currentUser.email,
-  buyerTwitterId: window.currentUser.twitterId || '',  // ★ 追加
+      makerId: currentCarDetail.makerId,
+      makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
+      buyerUid: window.currentUser.uid,
+      buyerName: document.getElementById('user-display-name').innerText || window.currentUser.email,
+      buyerTwitterId: window.currentUser.twitterId || '',
       gradeName: grade,
       colorName: color,
       options: options,
@@ -2482,49 +2507,29 @@ async function executePurchase() {
       appliedCouponCode: appliedCouponCode
     });
 
+    // ★★★ エラーハンドリング（GASでthrowされたメッセージを表示） ★★★
     if (!orderRes) {
-      alert('注文の作成に失敗しました。');
+      const errMsg = window._lastApiError || '注文の作成に失敗しました。';
+      alert(errMsg);
+      window._isPurchasing = false;
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = '購入・注文を送信'; }
       return;
     }
 
-    const twitterId = currentCarDetail.maker?.twitterId;
-    if (!twitterId) {
-      alert('メーカーのTwitter IDが未設定です。');
-      return;
-    }
-    const cleanId = twitterId.replace(/^@/, '');
-    const message = 
-`${currentCarDetail.contactDetail || '架空車街から購入希望です！'}
-【注文ID: ${orderRes.orderId}】
-車種: ${currentCarDetail.carName}
-グレード: ${grade}
-カラー: ${color}
-オプション: ${options.join(', ') || 'なし'}
-合計: ${totalPrice.toLocaleString()} CR`;
-
-    openTwitterDmModal(message, cleanId, orderRes.orderId);
-    return; // ★ ここで終了
-  }
-
-  // ★★★ ポータル注文（通常） ★★★
-  const res = await callGasApi('createOrder', {
-    carId: currentCarDetail.carId,
-    makerId: currentCarDetail.makerId,
-    makerUid: currentCarDetail.maker ? currentCarDetail.maker.uid : '',
-    buyerUid: window.currentUser.uid,
-    buyerName: document.getElementById('user-display-name').innerText || window.currentUser.email,
-    buyerTwitterId: window.currentUser.twitterId || '',
-    gradeName: grade,
-    colorName: color,
-    options: options,
-    totalPrice: totalPrice,
-    carName: currentCarDetail.carName,
-    appliedCouponCode: appliedCouponCode
-  });
-
-  if (res) {
-    alert(res.message);
+    // 成功時
+    alert(orderRes.message || '注文が確定しました！');
     closeModal('detail-modal');
+
+  } catch (e) {
+    // 万一の予期せぬエラー
+    alert(e.message || '予期せぬエラーが発生しました。');
+  } finally {
+    // ★★★ 必ずフラグを解除＆ボタンを戻す ★★★
+    window._isPurchasing = false;
+    if (buyBtn) {
+      buyBtn.disabled = false;
+      buyBtn.textContent = '購入・注文を送信';
+    }
   }
 }
 
