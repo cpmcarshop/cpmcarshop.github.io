@@ -1477,7 +1477,7 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
     const cached = apiCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
       // ★ キャッシュのデータにアイコンを付与してから表示
-      const enrichedCached = await enrichCarsWithMakerIcons(cached.data);
+      const enrichedCached = await enrichCarsWithMakerIcons(cached.data.cars);
       renderCarGrid('home-car-grid', enrichedCached);
       return;
     }
@@ -1918,9 +1918,9 @@ async function executeSearch() {
   if (currentSelectedMakerId) {
     filter.makerId = currentSelectedMakerId;
   }
-  const cars = await callGasApi('getCars', filter);
-  const cars = result.cars || [];   // 配列を抽出
-  const enrichedCars = await enrichCarsWithMakerIcons(cars);
+const result = await callGasApi('getCars', filter);
+const cars = result.cars || [];   // 配列を抽出
+const enrichedCars = await enrichCarsWithMakerIcons(cars);
 
   const grid = document.getElementById('search-car-grid');
   
@@ -2042,9 +2042,9 @@ document.getElementById('search-sort').addEventListener('change', function() {
 });
 
     async function loadRanking() {
-  const cars = await callGasApi('getCars', { ranking: true });
-      const cars = result.cars || [];
-      const enrichedCars = await enrichCarsWithMakerIcons(cars);
+const result = await callGasApi('getCars', { ranking: true });
+const cars = result.cars || [];
+const enrichedCars = await enrichCarsWithMakerIcons(cars);
 
   if (cars === null) {
     document.getElementById('ranking-car-grid').innerHTML = 
