@@ -57,7 +57,13 @@
     .tab-button.active { color: var(--main-color); border-bottom: 3px solid var(--main-color); background: rgba(0,210,255,0.05); }
     
     /* メインコンテンツ */
-    .container { max-width: 1100px; margin: 20px auto; padding: 0 15px; }
+    /* ===== メインコンテンツに上部の余白を追加（ヘッダー分） ===== */
+/* ===== メインコンテンツ ===== */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 15px 20px 15px;  /* ★ padding-top を通常の20pxに戻す */
+}
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     
@@ -661,6 +667,36 @@
 .crop-handle {
   pointer-events: auto;  /* ハンドルだけクリック可能に */
 }
+
+    /* ===== 追加するスタイル ===== */
+#header-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  transition: transform 0.3s ease; /* 滑らかなアニメーション */
+  background: var(--bg-color);      /* 背景色を設定（透過防止） */
+}
+
+/* 隠す時のクラス */
+#header-wrapper.hidden {
+  transform: translateY(-100%);
+}
+
+/* ===== 元の header から position: fixed; を削除 ===== */
+/* ===== 元の header から position: fixed; を削除し、レイアウトを space-between に戻す ===== */
+header {
+  /* position: fixed; ← これは削除済み */
+  display: flex;
+  justify-content: space-between;  /* ★ center から space-between に修正 */
+  align-items: center;
+  background: #0f3460; /* 元の背景色 */
+  padding: 15px 25px;
+  border-bottom: 2px solid var(--main-color);
+  box-shadow: 0 0 15px rgba(0,210,255,0.3);
+  /* 他のスタイルはそのまま */
+}
   </style>
 </head>
 <body>
@@ -695,6 +731,7 @@
 </div>
 </div>
 
+  <div id="header-wrapper">
   <header>
   <div style="display: flex; align-items: center;">
     <h1 style="line-height: 1.2;">
@@ -733,7 +770,7 @@
   <button class="tab-button" id="tab-btn-ranking" onclick="switchTab('ranking')">ランキング</button>
   <button class="tab-button" id="mypage-tab" onclick="switchTab('mypage')">マイページ・店舗管理</button>
 </nav>
-
+  </div>
   <div class="container">
     <!-- 1. ホームタブ -->
     <!-- ★ ここから追加（自由記述スペース） -->
@@ -3848,6 +3885,7 @@ function showResetView() {
   document.getElementById('reset-send-btn').textContent = 'リセットメールを送信';
 }
 
+
 // パスワードリセットメール送信（Firebase標準機能）
 async function sendPasswordReset() {
   const email = document.getElementById('reset-email').value.trim();
@@ -3936,7 +3974,71 @@ loadHomeCars = async function(force = false) {
     // 初期表示
 loadHomeCars();
 loadAnnouncement(); // ★ 追加
-  </script>
+// ============================================================
+// スクロールに合わせたヘッダー表示/非表示（方向検知＋閾値版）
+// ============================================================
+(function() {
+  const wrapper = document.getElementById('header-wrapper');
+  const container = document.querySelector('.container');
+  if (!wrapper || !container) return;
+
+  // ヘッダーの高さを動的に取得してコンテナのパディングを調整（これはそのまま）
+  function updateHeaderHeight() {
+    const headerHeight = wrapper.offsetHeight;
+    container.style.paddingTop = (headerHeight + 20) + 'px';
+    console.log('📏 ヘッダー高さ:', headerHeight, 'px');
+  }
+
+  // スクロール検知用
+  let lastScrollY = window.scrollY;
+  let ticking = false;
+  const SCROLL_THRESHOLD = 30; // このpx数以上スクロールしたら反応
+
+  function toggleHeaderByDirection() {
+    const currentScrollY = window.scrollY;
+    const delta = currentScrollY - lastScrollY;
+
+    // 閾値を超えた場合のみ方向を判定
+    if (delta > SCROLL_THRESHOLD) {
+      // 下にスクロール → ヘッダーを隠す
+      wrapper.classList.add('hidden');
+    } else if (delta < -SCROLL_THRESHOLD) {
+      // 上にスクロール → ヘッダーを表示
+      wrapper.classList.remove('hidden');
+    }
+    // 閾値未満の微細な動きは無視
+
+    // 常に最新のスクロール位置を更新（閾値内でも更新しないとズレる）
+    lastScrollY = currentScrollY;
+  }
+
+  // スクロールイベント（requestAnimationFrameで最適化）
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      window.requestAnimationFrame(function() {
+        toggleHeaderByDirection();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  });
+
+  // ページ読み込み完了時・リサイズ時に高さを更新
+  window.addEventListener('load', function() {
+    updateHeaderHeight();
+    // 初期状態は表示（hidden クラスを確実に外す）
+    wrapper.classList.remove('hidden');
+  });
+
+  window.addEventListener('resize', function() {
+    updateHeaderHeight();
+  });
+
+  // 画像読み込みなどで高さが変わる場合に備えて遅延更新
+  setTimeout(function() {
+    updateHeaderHeight();
+  }, 500);
+})();  </script>
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
   <p><a href="terms.html" style="color: var(--main-color); text-decoration: none;">利用規約 兼 プライバシーポリシー</a></p>
