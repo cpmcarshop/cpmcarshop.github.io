@@ -2142,13 +2142,12 @@ return `
           <div class="card-subtitle">${c.makerName}</div>
           <h3 class="card-title">${c.carName}</h3>
           <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
-          // priceDisplay の後
-${priceDisplay}
-<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
-  <span style="font-size:0.85rem; color:${c.status === '販売中' ? '#4caf50' : c.status === '受注停止' ? '#ff9800' : '#f44336'}; font-weight:bold;">
-    ${c.status}
-  </span>
-</div>
+          ${priceDisplay}
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
+          <span style="font-size:0.85rem; color:${c.status === '販売中' ? '#4caf50' : c.status === '受注停止' ? '#ff9800' : '#f44336'}; font-weight:bold;">
+          ${c.status}
+          </span>
+    </div>
 ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
 <div style="display:flex; gap:5px; flex-wrap:wrap;">
   <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
