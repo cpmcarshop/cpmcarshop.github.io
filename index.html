@@ -697,6 +697,45 @@ header {
   box-shadow: 0 0 15px rgba(0,210,255,0.3);
   /* 他のスタイルはそのまま */
 }
+
+    /* カードグリッドの下部フェード */
+#home-car-grid {
+  position: relative;
+}
+#home-car-grid::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, var(--bg-color));
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 1;
+}
+#home-car-grid.loading::after {
+  opacity: 0; /* 読み込み中はフェードを消す */
+}
+
+/* ローディングインジケータ（スピナー） */
+#loading-indicator {
+  display: none;
+  text-align: center;
+  padding: 20px 0;
+}
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #333;
+  border-top-color: var(--main-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
   </style>
 </head>
 <body>
@@ -791,6 +830,11 @@ header {
 
   <h2>注目の架空車</h2>
   <div id="home-car-grid" class="card-grid"></div>
+<div id="loading-indicator">
+  <div class="spinner"></div>
+  <p>読み込み中...</p>
+</div>
+<div id="scroll-sentinel" style="height: 1px; visibility: hidden;"></div>
 </main>  <!-- ← この行を追加（閉じタグ） -->
 
 <!-- 2. 車両検索タブ -->
@@ -1749,47 +1793,94 @@ async function saveTwitterId() {
     });
   }
 }
+
+    function setupInfiniteScroll() {
+  const sentinel = document.getElementById('scroll-sentinel');
+  if (!sentinel) return;
+  const observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !homeIsLoading && !homeAllLoaded) {
+      loadHomeCars();
+    }
+  }, { rootMargin: '0px 0px 200px 0px' });
+  observer.observe(sentinel);
+}
+    // ページネーション管理変数（ホームタブ用）
+let homeOffset = 0;
+const HOME_PAGE_SIZE = 30;
+let homeTotal = 0;
+let homeAllLoaded = false;
+let homeIsLoading = false;
 // ホームタブ読み込み（初期表示用）
 // ホームタブ読み込み（viewCount降順で表示）
 async function loadHomeCars(force = false) {
-  const cacheKey = 'getCars{"sortBy":"view"}'; // キャッシュキーを変更
+  if (homeAllLoaded && !force) return;
+  if (homeIsLoading) return;
+  homeIsLoading = true;
+
+  // ローディング表示
+  document.getElementById('loading-indicator').style.display = 'block';
+  document.getElementById('home-car-grid').classList.add('loading');
+
+  // ★ オフセットごとにキャッシュキーを分ける
+  const cacheKey = 'getCars_sortBy_view_offset_' + homeOffset;
   const cached = apiCache[cacheKey];
-  // 修正後
-if (!force && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-  console.log('ホーム: キャッシュを使用');
-  document.getElementById('total-car-count').innerText = cached.data.length;
-  const enrichedCars = await enrichCarsWithMakerIcons(cached.data);  // ← この1行を追加
-  renderCarGrid('home-car-grid', enrichedCars);  // ← ここを cached.data → enrichedCars に変更
-  return;
-}
-  isInitialLoad = true;
-  const cars = await callGasApi('getCars', { sortBy: 'view' });
-  const enrichedCars = await enrichCarsWithMakerIcons(cars);
-
-  // 取得した車両データの件数を表示
-if (cars) {
-  document.getElementById('total-car-count').innerText = cars.length;
-}
-  // ★sortByを指定
-  isInitialLoad = false;
-
-
-  
-  const grid = document.getElementById('home-car-grid');
-  if (cars === null || cars.length === 0) {
-    if (cached && cached.data && cached.data.length > 0) {
-      renderCarGrid('home-car-grid', cached.data);
-      return;
+  if (!force && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log('ホーム: キャッシュ使用 (offset=' + homeOffset + ')');
+    const enrichedCars = await enrichCarsWithMakerIcons(cached.data.cars);
+    if (homeOffset === 0) {
+      document.getElementById('home-car-grid').innerHTML = '';
     }
-    grid.innerHTML = `
-      <div style="text-align:center; padding:40px; color:#888; grid-column: 1 / -1;">
-        <p>データの読み込みに失敗しました。</p>
-        <button class="btn" onclick="loadHomeCars(true)" style="margin-top:10px;">再読み込み</button>
-      </div>
-    `;
-  } else {
-    renderCarGrid('home-car-grid', enrichedCars);
+    renderCarGrid('home-car-grid', enrichedCars, false, false, true); // append=true
+    homeOffset += enrichedCars.length;
+    homeTotal = cached.data.total;
+    document.getElementById('total-car-count').innerText = homeTotal;
+    if (homeOffset >= homeTotal) {
+      homeAllLoaded = true;
+      document.getElementById('scroll-sentinel').style.display = 'none';
+    }
+    homeIsLoading = false;
+    document.getElementById('loading-indicator').style.display = 'none';
+    document.getElementById('home-car-grid').classList.remove('loading');
+    return;
   }
+
+  const result = await callGasApi('getCars', {
+    sortBy: 'view',
+    offset: homeOffset,
+    limit: HOME_PAGE_SIZE
+  });
+
+  if (result && result.cars) {
+    homeTotal = result.total;
+    document.getElementById('total-car-count').innerText = homeTotal;
+
+    const enrichedCars = await enrichCarsWithMakerIcons(result.cars);
+    if (homeOffset === 0) {
+      document.getElementById('home-car-grid').innerHTML = '';
+    }
+    renderCarGrid('home-car-grid', enrichedCars, false, false, true); // append=true
+
+    homeOffset += result.cars.length;
+    if (homeOffset >= homeTotal) {
+      homeAllLoaded = true;
+      document.getElementById('scroll-sentinel').style.display = 'none';
+    }
+
+    // キャッシュに保存（オフセット付き）
+    apiCache[cacheKey] = {
+      data: result,
+      timestamp: Date.now()
+    };
+  } else {
+    // エラーハンドリング
+    if (homeOffset === 0) {
+      document.getElementById('home-car-grid').innerHTML = `<p>データの読み込みに失敗しました。</p>`;
+    }
+  }
+
+  homeIsLoading = false;
+  document.getElementById('loading-indicator').style.display = 'none';
+  document.getElementById('home-car-grid').classList.remove('loading');
 }
     // ハンバーガーメニュー開閉
 document.getElementById('hamburgerBtn').addEventListener('click', function(e) {
@@ -1814,6 +1905,7 @@ switchTab = function(tabId) {
     menu.classList.remove('open');
   }
 };
+  
     // グローバル変数追加（既存のコードの先頭付近に追加）
 let currentSearchResults = [];
 let currentSort = 'new';
@@ -2013,9 +2105,9 @@ return `
 }
     // 1枚目(img1)をメイン画像として描画
  // 1枚目(img1)をメイン画像として描画（showRank オプション追加）
-function renderCarGrid(targetId, cars, isMyCars = false, showRank = false) {
+function renderCarGrid(targetId, cars, isMyCars = false, showRank = false, append = false) {
   const grid = document.getElementById(targetId);
-  grid.innerHTML = cars.map((c, index) => {
+  const html = cars.map((c, index) => {
     const rank = index + 1;
     let rankBadge = '';
     if (showRank) {
@@ -2079,7 +2171,12 @@ return `
         </div>
       </div>
     `;
-  }).join('');
+   }).join('');
+  if (append) {
+    grid.insertAdjacentHTML('beforeend', html);
+  } else {
+    grid.innerHTML = html;
+  }
 }
 
     // ========================
@@ -3974,6 +4071,7 @@ loadHomeCars = async function(force = false) {
     // 初期表示
 loadHomeCars();
 loadAnnouncement(); // ★ 追加
+    setupInfiniteScroll();
 // ============================================================
 // スクロールに合わせたヘッダー表示/非表示（方向検知＋閾値版）
 // ============================================================
