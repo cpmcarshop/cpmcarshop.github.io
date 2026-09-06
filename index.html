@@ -1845,10 +1845,10 @@ async function loadHomeCars(force = false) {
   }
 
   const result = await callGasApi('getCars', {
-    sortBy: 'view',
-    offset: homeOffset,
-    limit: HOME_PAGE_SIZE
-  });
+  sortBy: 'view',
+  offset: homeOffset,
+  limit: HOME_PAGE_SIZE
+}, false);  // ← 全画面ローディングを表示しない
 
   if (result && result.cars) {
     homeTotal = result.total;
@@ -1919,6 +1919,7 @@ async function executeSearch() {
     filter.makerId = currentSelectedMakerId;
   }
   const cars = await callGasApi('getCars', filter);
+  const cars = result.cars || [];   // 配列を抽出
   const enrichedCars = await enrichCarsWithMakerIcons(cars);
 
   const grid = document.getElementById('search-car-grid');
@@ -2042,6 +2043,7 @@ document.getElementById('search-sort').addEventListener('change', function() {
 
     async function loadRanking() {
   const cars = await callGasApi('getCars', { ranking: true });
+      const cars = result.cars || [];
       const enrichedCars = await enrichCarsWithMakerIcons(cars);
 
   if (cars === null) {
@@ -2725,8 +2727,9 @@ window._currentMaker = maker;
   }
 
   // ★ 自社車両一覧を先に取得（セレクトボックス用）
-  const myCars = await callGasApi('getCars', { makerId: maker.makerId });
-  const enrichedCars = await enrichCarsWithMakerIcons(myCars);
+  const result = await callGasApi('getCars', { makerId: maker.makerId });
+const myCars = result.cars || [];
+const enrichedCars = await enrichCarsWithMakerIcons(myCars);
 
 
   // statusArea.innerHTML 内にCPM IDを追加
