@@ -698,25 +698,7 @@ header {
   /* 他のスタイルはそのまま */
 }
 
-    /* カードグリッドの下部フェード */
-#home-car-grid {
-  position: relative;
-}
-#home-car-grid::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, transparent, var(--bg-color));
-  pointer-events: none;
-  transition: opacity 0.3s;
-  z-index: 1;
-}
-#home-car-grid.loading::after {
-  opacity: 0; /* 読み込み中はフェードを消す */
-}
+
 
 /* ローディングインジケータ（スピナー） */
 #loading-indicator {
