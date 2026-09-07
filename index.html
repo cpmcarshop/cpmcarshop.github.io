@@ -4210,7 +4210,6 @@ let fcmToken = null;
 async function togglePushNotification(enabled) {
   const statusEl = document.getElementById('push-status');
   if (enabled) {
-    // 1. ブラウザ通知許可をリクエスト
     if (!('Notification' in window)) {
       alert('お使いのブラウザは通知に対応していません。');
       document.getElementById('push-toggle').checked = false;
@@ -4223,21 +4222,32 @@ async function togglePushNotification(enabled) {
       statusEl.textContent = 'オフ';
       return;
     }
-if (!window.currentUser) {
-    alert('ログインしてください。');
-    document.getElementById('push-toggle').checked = false;
-    return;
-  }
+    if (!window.currentUser) {
+      alert('ログインしてください。');
+      document.getElementById('push-toggle').checked = false;
+      return;
+    }
 
-    // 2. FCMトークンを取得（Service Workerが登録されていることが前提）
     try {
+      // ★★★★★ Service Worker を確実にアクティブにする ★★★★★
+      let registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+      if (!registration) {
+        // まだ登録されていなければ登録
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Service Worker 登録完了');
+      }
+      // Service Worker がアクティブになるのを待つ
+      await navigator.serviceWorker.ready;
+
       const messaging = window.firebaseMessaging;
+      // ★ トークン取得時に registration を明示的に渡す
       const token = await getToken(messaging, {
-        vapidKey: 'BPhbgHl_F5taH71U_h5vMp0qMGNTUBVMn7VrT2TdVGD7IRAU-ib8N6g_9MRrjpMfQAagYCT9TP2_U9JJLy_CkxY' // ★ VAPIDキーが必要な場合（省略可）
+        vapidKey: 'BPhbgHl_F5taH71U_h5vMp0qMGNTUBVMn7VrT2TdVGD7IRAU-ib8N6g_9MRrjpMfQAagYCT9TP2_U9JJLy_CkxY',
+        serviceWorkerRegistration: registration   // ← これを追加！
       });
+
       if (token) {
         fcmToken = token;
-        // 3. サーバーにトークンと有効状態を保存
         await callGasApi('savePushSettings', {
           uid: window.currentUser.uid,
           enabled: true,
@@ -4246,7 +4256,7 @@ if (!window.currentUser) {
         statusEl.textContent = 'オン';
         statusEl.style.color = '#4caf50';
       } else {
-        alert('トークン取得に失敗しました（Service Workerが正しく登録されていない可能性があります）。');
+        alert('トークン取得に失敗しました（Service Workerが正しく動作していない可能性があります）。');
         document.getElementById('push-toggle').checked = false;
       }
     } catch (e) {
@@ -4255,7 +4265,7 @@ if (!window.currentUser) {
       document.getElementById('push-toggle').checked = false;
     }
   } else {
-    // オフにする
+    // オフにする処理（変更なし）
     await callGasApi('savePushSettings', {
       uid: window.currentUser.uid,
       enabled: false,
