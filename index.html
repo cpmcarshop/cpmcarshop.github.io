@@ -1158,7 +1158,7 @@ window.firebaseMessaging = messaging; // グローバルに公開
         console.error('リダイレクトエラー:', error);
       });
     
-    onAuthStateChanged(auth, async (user) => {
+   onAuthStateChanged(auth, async (user) => {
   if (user) {
     window.currentUser = user;
     document.getElementById('user-display-name').innerText = '認証中...';
@@ -1172,7 +1172,7 @@ window.firebaseMessaging = messaging; // グローバルに公開
       username: '',
       email: user.email,
       _t: Date.now()
-    }, true, true); // forceRefresh = true
+    }, true, true);
 
     // ★ ユーザー名のチェック（モーダル表示のみ）
     if (userInfo && userInfo.name === '') {
@@ -1180,20 +1180,19 @@ window.firebaseMessaging = messaging; // グローバルに公開
     } else {
       document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
     }
-  // ★★★ Service Worker 登録 ★★★
-  if ('serviceWorker' in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('Service Worker 登録成功:', registration);
-    } catch (err) {
-      console.error('Service Worker 登録失敗:', err);
+
+    // ★★★ Service Worker 登録 ★★★
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Service Worker 登録成功:', registration);
+      } catch (err) {
+        console.error('Service Worker 登録失敗:', err);
+      }
     }
-  }
 
-  // ★★★ 現在の設定状態を読み込んでトグルの状態を反映 ★★★
-}
-
-
+    // ★★★ 現在の設定状態を読み込んでトグルの状態を反映 ★★★
+    loadPushSettings();  // ← 追加！
 
     // ★ Twitter ID のチェック（モーダル表示のみ）
     const twitterId = userInfo?.twitterId || '';
@@ -1204,9 +1203,10 @@ window.firebaseMessaging = messaging; // グローバルに公開
     }
 
     // ★★★ loadMypageData は呼ばない（マイページタブをクリックしたときに初めて呼ばれる） ★★★
-    // もしも初期表示で何か軽量なデータが必要ならここで取得するが、今回は不要
-checkAndShowAnnouncements();
+    checkAndShowAnnouncements();
+
   } else {
+    // ログアウト時
     window.currentUser = null;
     document.getElementById('user-display-name').innerText = '';
     document.getElementById('auth-btn').innerText = 'ログイン / 登録';
