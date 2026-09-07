@@ -4278,22 +4278,21 @@ async function togglePushNotification(enabled) {
         token: token
       });
 
-      if (result) {
+            if (result) {
         fcmToken = token;
         // ★ ここで初めてUIを「オン」にする
         toggle.checked = true;
         statusEl.textContent = 'オン';
         statusEl.style.color = '#4caf50';
       } else {
-  const errMsg = window._lastApiError || 'サーバーが応答しませんでした。';
-  alert('❌ 設定の保存に失敗しました: ' + errMsg);
-} else {
-        alert('設定の保存に失敗しました。');
+        // ★ エラー詳細を表示
+        const errMsg = window._lastApiError || 'サーバーが応答しませんでした。';
+        alert('❌ 設定の保存に失敗しました: ' + errMsg);
+        // ロールバック
         toggle.checked = false;
         statusEl.textContent = 'オフ';
         statusEl.style.color = '#aaa';
       }
-
     } catch (e) {
       console.error(e);
       alert('通知設定中にエラーが発生しました: ' + e.message);
