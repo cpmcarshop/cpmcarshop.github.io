@@ -718,6 +718,48 @@ header {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* トグルスイッチ */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #555;
+  transition: .3s;
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: var(--main-color);
+}
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
   </style>
 </head>
 <body>
@@ -1065,22 +1107,23 @@ header {
 
 <!-- Firebase モジュール SDK (v10) -->
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut,
-  getRedirectResult,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-  sendPasswordResetEmail   // ★ 追加
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { 
+    getAuth, 
+    signInWithPopup, 
+    GoogleAuthProvider, 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    onAuthStateChanged, 
+    signOut,
+    getRedirectResult,
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    updatePassword,
+    sendPasswordResetEmail
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  // ★★★ ここに追加 ★★★
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
     // Firebase 設定
     const firebaseConfig = {
       apiKey: "AIzaSyCffFYNOEcrGu2GKgSiE6q6KgGkCtxJEFw",
@@ -1092,7 +1135,10 @@ header {
     };
 
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
+const auth = getAuth(app);
+// ★★★ 追加 ★★★
+const messaging = getMessaging(app);
+window.firebaseMessaging = messaging; // グローバルに公開
     window.firebaseAuth = auth;
     window.GoogleAuthProvider = GoogleAuthProvider;
     window.signInWithPopup = signInWithPopup;
@@ -1134,6 +1180,20 @@ header {
     } else {
       document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
     }
+  // ★★★ Service Worker 登録 ★★★
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('Service Worker 登録成功:', registration);
+    } catch (err) {
+      console.error('Service Worker 登録失敗:', err);
+    }
+  }
+
+  // ★★★ 現在の設定状態を読み込んでトグルの状態を反映 ★★★
+}
+
+
 
     // ★ Twitter ID のチェック（モーダル表示のみ）
     const twitterId = userInfo?.twitterId || '';
@@ -2733,6 +2793,14 @@ statusArea.innerHTML = `
       <p style="font-size:0.85rem;">@${maker.twitterId} | ${maker.description}</p>
       ${maker.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${maker.cpmId}</p>` : ''}
       <button class="btn btn-secondary" onclick="openMakerModal()">メーカー情報を編集</button>
+    <div style="margin-top:12px; display:flex; align-items:center; gap:12px; border-top:1px solid #333; padding-top:10px;">
+        <span style="font-weight:bold;">🔔 注文のプッシュ通知</span>
+        <label class="switch">
+          <input type="checkbox" id="push-toggle" onchange="togglePushNotification(this.checked)">
+          <span class="slider round"></span>
+        </label>
+        <span id="push-status" style="font-size:0.9rem; color:#aaa;">オフ</span>
+      </div>
     </div>
   </div>
 `;
@@ -2791,7 +2859,8 @@ statusArea.innerHTML = `
     </div>
   `;
 
-  statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);// 注文・通知一覧（既存）
+  statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
+loadPushSettings();// 注文・通知一覧（既存）
 const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
 const orderList = document.getElementById('orders-notification-list');
 if (orderRes && orderRes.orders.length > 0) {
@@ -4131,7 +4200,92 @@ loadAnnouncement(); // ★ 追加
   setTimeout(function() {
     updateHeaderHeight();
   }, 500);
-})();  </script>
+})(); 
+
+// ===== プッシュ通知トグル処理 =====
+let fcmToken = null;
+
+async function togglePushNotification(enabled) {
+  const statusEl = document.getElementById('push-status');
+  if (enabled) {
+    // 1. ブラウザ通知許可をリクエスト
+    if (!('Notification' in window)) {
+      alert('お使いのブラウザは通知に対応していません。');
+      document.getElementById('push-toggle').checked = false;
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      alert('通知が許可されませんでした。ブラウザの設定で許可してください。');
+      document.getElementById('push-toggle').checked = false;
+      statusEl.textContent = 'オフ';
+      return;
+    }
+if (!window.currentUser) {
+    alert('ログインしてください。');
+    document.getElementById('push-toggle').checked = false;
+    return;
+  }
+
+    // 2. FCMトークンを取得（Service Workerが登録されていることが前提）
+    try {
+      const messaging = window.firebaseMessaging;
+      const token = await getToken(messaging, {
+        vapidKey: 'BPhbgHl_F5taH71U_h5vMp0qMGNTUBVMn7VrT2TdVGD7IRAU-ib8N6g_9MRrjpMfQAagYCT9TP2_U9JJLy_CkxY' // ★ VAPIDキーが必要な場合（省略可）
+      });
+      if (token) {
+        fcmToken = token;
+        // 3. サーバーにトークンと有効状態を保存
+        await callGasApi('savePushSettings', {
+          uid: window.currentUser.uid,
+          enabled: true,
+          token: token
+        });
+        statusEl.textContent = 'オン';
+        statusEl.style.color = '#4caf50';
+      } else {
+        alert('トークン取得に失敗しました（Service Workerが正しく登録されていない可能性があります）。');
+        document.getElementById('push-toggle').checked = false;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('通知設定中にエラーが発生しました: ' + e.message);
+      document.getElementById('push-toggle').checked = false;
+    }
+  } else {
+    // オフにする
+    await callGasApi('savePushSettings', {
+      uid: window.currentUser.uid,
+      enabled: false,
+      token: null
+    });
+    fcmToken = null;
+    statusEl.textContent = 'オフ';
+    statusEl.style.color = '#aaa';
+  }
+}
+
+async function loadPushSettings() {
+  if (!window.currentUser) return;
+  const toggle = document.getElementById('push-toggle');
+  if (!toggle) return; // ★ 追加（トグルがまだない場合）
+  const result = await callGasApi('getPushSettings', { uid: window.currentUser.uid });
+  if (result) {
+    const status = document.getElementById('push-status');
+    if (result.enabled && result.token) {
+      toggle.checked = true;
+      status.textContent = 'オン';
+      status.style.color = '#4caf50';
+      fcmToken = result.token;
+    } else {
+      toggle.checked = false;
+      status.textContent = 'オフ';
+      status.style.color = '#aaa';
+    }
+  }
+}
+
+ </script>
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
   <p><a href="terms.html" style="color: var(--main-color); text-decoration: none;">利用規約 兼 プライバシーポリシー</a></p>
