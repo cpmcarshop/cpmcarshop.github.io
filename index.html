@@ -2798,7 +2798,7 @@ statusArea.innerHTML = `
     <div style="margin-top:12px; display:flex; align-items:center; gap:12px; border-top:1px solid #333; padding-top:10px;">
         <span style="font-weight:bold;">🔔 注文のプッシュ通知</span>
         <label class="switch">
-          <input type="checkbox" id="push-toggle" onchange="togglePushNotification(this.checked)">
+          <input type="checkbox" id="push-toggle" onclick="togglePushNotification(this.checked)">
           <span class="slider round"></span>
         </label>
         <span id="push-status" style="font-size:0.9rem; color:#aaa;">オフ</span>
@@ -4285,6 +4285,9 @@ async function togglePushNotification(enabled) {
         statusEl.textContent = 'オン';
         statusEl.style.color = '#4caf50';
       } else {
+  const errMsg = window._lastApiError || 'サーバーが応答しませんでした。';
+  alert('❌ 設定の保存に失敗しました: ' + errMsg);
+} else {
         alert('設定の保存に失敗しました。');
         toggle.checked = false;
         statusEl.textContent = 'オフ';
