@@ -4209,94 +4209,180 @@ let fcmToken = null;
 
 async function togglePushNotification(enabled) {
   const statusEl = document.getElementById('push-status');
-  if (enabled) {
-    if (!('Notification' in window)) {
-      alert('お使いのブラウザは通知に対応していません。');
-      document.getElementById('push-toggle').checked = false;
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      alert('通知が許可されませんでした。ブラウザの設定で許可してください。');
-      document.getElementById('push-toggle').checked = false;
-      statusEl.textContent = 'オフ';
-      return;
-    }
-    if (!window.currentUser) {
-      alert('ログインしてください。');
-      document.getElementById('push-toggle').checked = false;
-      return;
-    }
+  const toggle = document.getElementById('push-toggle');
+  
+  // ★ トグルを一時的に無効化して連打を防止
+  toggle.disabled = true;
 
+  if (enabled) {
+    // --- ONにする処理 ---
     try {
-      // ★★★★★ Service Worker を確実にアクティブにする ★★★★★
+      // 1. ブラウザ通知許可チェック
+      if (!('Notification' in window)) {
+        alert('お使いのブラウザは通知に対応していません。');
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
+        toggle.disabled = false;
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('通知が許可されませんでした。ブラウザの設定で許可してください。');
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
+        toggle.disabled = false;
+        return;
+      }
+
+      if (!window.currentUser) {
+        alert('ログインしてください。');
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
+        toggle.disabled = false;
+        return;
+      }
+
+      // 2. Service Worker の準備
       let registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
       if (!registration) {
-        // まだ登録されていなければ登録
         registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
         console.log('Service Worker 登録完了');
       }
-      // Service Worker がアクティブになるのを待つ
       await navigator.serviceWorker.ready;
 
+      // 3. FCMトークン取得
       const messaging = window.firebaseMessaging;
-      // ★ トークン取得時に registration を明示的に渡す
       const token = await getToken(messaging, {
         vapidKey: 'BPhbgHl_F5taH71U_h5vMp0qMGNTUBVMn7VrT2TdVGD7IRAU-ib8N6g_9MRrjpMfQAagYCT9TP2_U9JJLy_CkxY',
-        serviceWorkerRegistration: registration   // ← これを追加！
+        serviceWorkerRegistration: registration
       });
 
-      if (token) {
+      if (!token) {
+        alert('トークン取得に失敗しました。');
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
+        toggle.disabled = false;
+        return;
+      }
+
+      // 4. ★★★ サーバーに保存する前にUIを「オン」にしない！ ★★★
+      //    サーバー保存が成功してからUIを更新する
+      const result = await callGasApi('savePushSettings', {
+        uid: window.currentUser.uid,
+        enabled: true,
+        token: token
+      });
+
+      if (result) {
         fcmToken = token;
-        await callGasApi('savePushSettings', {
-          uid: window.currentUser.uid,
-          enabled: true,
-          token: token
-        });
+        // ★ ここで初めてUIを「オン」にする
+        toggle.checked = true;
         statusEl.textContent = 'オン';
         statusEl.style.color = '#4caf50';
       } else {
-        alert('トークン取得に失敗しました（Service Workerが正しく動作していない可能性があります）。');
-        document.getElementById('push-toggle').checked = false;
+        alert('設定の保存に失敗しました。');
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
       }
+
     } catch (e) {
       console.error(e);
       alert('通知設定中にエラーが発生しました: ' + e.message);
-      document.getElementById('push-toggle').checked = false;
+      toggle.checked = false;
+      statusEl.textContent = 'オフ';
+      statusEl.style.color = '#aaa';
     }
+
   } else {
-    // オフにする処理（変更なし）
-    await callGasApi('savePushSettings', {
-      uid: window.currentUser.uid,
-      enabled: false,
-      token: null
-    });
-    fcmToken = null;
-    statusEl.textContent = 'オフ';
-    statusEl.style.color = '#aaa';
+    // --- OFFにする処理 ---
+    try {
+      // ★★★ サーバーに保存してからUIを更新 ★★★
+      const result = await callGasApi('savePushSettings', {
+        uid: window.currentUser.uid,
+        enabled: false,
+        token: null
+      });
+
+      if (result) {
+        fcmToken = null;
+        toggle.checked = false;
+        statusEl.textContent = 'オフ';
+        statusEl.style.color = '#aaa';
+      } else {
+        alert('設定の保存に失敗しました。');
+        // 失敗時はONのままにする
+        toggle.checked = true;
+        statusEl.textContent = 'オン';
+        statusEl.style.color = '#4caf50';
+      }
+    } catch (e) {
+      console.error(e);
+      alert('設定の保存に失敗しました: ' + e.message);
+      // 失敗時はONのままにする
+      toggle.checked = true;
+      statusEl.textContent = 'オン';
+      statusEl.style.color = '#4caf50';
+    }
   }
+
+  // ★ トグルを再度有効化
+  toggle.disabled = false;
 }
 
 async function loadPushSettings() {
-  if (!window.currentUser) return;
+  if (!window.currentUser) {
+    console.log('loadPushSettings: ユーザー未ログイン');
+    return;
+  }
+  
   const toggle = document.getElementById('push-toggle');
-  if (!toggle) return; // ★ 追加（トグルがまだない場合）
-  const result = await callGasApi('getPushSettings', { uid: window.currentUser.uid });
-  if (result) {
-    const status = document.getElementById('push-status');
-    if (result.enabled && result.token) {
-      toggle.checked = true;
-      status.textContent = 'オン';
-      status.style.color = '#4caf50';
-      fcmToken = result.token;
+  const status = document.getElementById('push-status');
+  
+  // ★ トグルが存在しない場合は何もしない（安全ガード）
+  if (!toggle || !status) {
+    console.log('loadPushSettings: トグル要素が見つかりません');
+    return;
+  }
+
+  // ★ 現在のチェック状態を保持（連続呼び出し対策）
+  if (toggle.dataset.loading === 'true') {
+    console.log('loadPushSettings: 読み込み中です');
+    return;
+  }
+  toggle.dataset.loading = 'true';
+
+  try {
+    const result = await callGasApi('getPushSettings', { uid: window.currentUser.uid });
+    if (result) {
+      if (result.enabled && result.token) {
+        toggle.checked = true;
+        status.textContent = 'オン';
+        status.style.color = '#4caf50';
+        fcmToken = result.token;
+      } else {
+        toggle.checked = false;
+        status.textContent = 'オフ';
+        status.style.color = '#aaa';
+        fcmToken = null;
+      }
     } else {
+      // 設定がない場合はデフォルト（オフ）
       toggle.checked = false;
       status.textContent = 'オフ';
       status.style.color = '#aaa';
     }
+  } catch (e) {
+    console.error('loadPushSettingsエラー:', e);
+  } finally {
+    toggle.dataset.loading = 'false';
   }
 }
-
  </script>
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
