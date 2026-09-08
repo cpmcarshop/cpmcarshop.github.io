@@ -14,20 +14,22 @@ const messaging = firebase.messaging();
 
 // ★ バックグラウンドメッセージ（データメッセージ）の処理
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] バックグラウンドメッセージ受信:', payload);
+  const data = payload.data || {};
+  const title = '🚗 新しい注文が入りました！';
+  const body =
+    `${data.buyerName || '購入者'} 様が ${data.carName || '車両'} を注文しました。\n` +
+    `グレード: ${data.gradeName || '未選択'}\n` +
+    `カラー: ${data.colorName || '未選択'}\n` +
+    `オプション: ${data.options || 'なし'}\n` +
+    `合計金額: ${data.totalPrice || '0'} CR\n` +
+    `クーポン: ${data.couponApplied || 'なし'}\n` +
+    `注文ID: ${data.orderId || '不明'}`;
 
-  // ★ notification がなくてもエラーにならないようにガード
-  const notificationTitle = payload.notification?.title || '新着通知';
-  const notificationBody = payload.notification?.body || '詳細はアプリで確認してください';
-  const clickAction = payload.data?.click_action || 'https://twitter.com';
-
-  const options = {
-    body: notificationBody,
+  self.registration.showNotification(title, {
+    body: body,
     icon: '/icons/icon-192x192.png',
-    data: { url: clickAction }
-  };
-
-  self.registration.showNotification(notificationTitle, options);
+    data: { url: data.click_action || 'https://twitter.com' }
+  });
 });
 
 // ★ 通知クリック時の処理
