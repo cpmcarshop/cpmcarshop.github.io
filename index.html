@@ -4386,7 +4386,24 @@ async function loadPushSettings() {
   }
 }
 
+// ★★★ フォアグラウンド（タブがアクティブなとき）のメッセージ処理 ★★★
+if (window.firebaseMessaging) {
+  window.onMessage(window.firebaseMessaging, function(payload) {
+    console.log('[FW] フォアグラウンドメッセージ受信:', payload);
+    var data = payload.data || {};
+    var title = '🚗 新しい注文が入りました！';
+    var body =
+      (data.buyerName ? data.buyerName + ' 様が ' : '') +
+      (data.carName ? data.carName + ' を注文しました。' : '注文がありました。');
 
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body: body,
+        icon: '/icons/icon-192x192.png'
+      });
+    }
+  });
+}
  </script>
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
