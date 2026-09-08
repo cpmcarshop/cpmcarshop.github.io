@@ -12,13 +12,11 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// ★ バックグラウンド（タブが閉じている or 最小化）用
 messaging.onBackgroundMessage(function(payload) {
   console.log('[SW] バックグラウンドメッセージ受信:', payload);
-
   var data = payload.data || {};
   var title = '🚗 新しい注文が入りました！';
-
-  // ★ 文字列連結（+演算子）で安全に組み立てる ★
   var body = '';
   body = body + (data.buyerName || '購入者') + ' 様が ';
   body = body + (data.carName || '車両') + ' を注文しました。\n';
