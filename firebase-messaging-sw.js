@@ -12,20 +12,29 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// ★ バックグラウンドメッセージ（データメッセージ）の処理
 messaging.onBackgroundMessage((payload) => {
-  const notification = payload.notification;
-  const data = payload.data || {};
+  console.log('[SW] バックグラウンドメッセージ受信:', payload);
+
+  // ★ notification がなくてもエラーにならないようにガード
+  const notificationTitle = payload.notification?.title || '新着通知';
+  const notificationBody = payload.notification?.body || '詳細はアプリで確認してください';
+  const clickAction = payload.data?.click_action || 'https://twitter.com';
+
   const options = {
-    body: notification.body,
+    body: notificationBody,
     icon: '/icons/icon-192x192.png',
-    data: { url: data.click_action || 'https://twitter.com' }
+    data: { url: clickAction }
   };
-  self.registration.showNotification(notification.title, options);
+
+  self.registration.showNotification(notificationTitle, options);
 });
 
+// ★ 通知クリック時の処理
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const urlToOpen = event.notification.data?.url || 'https://twitter.com';
+
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then((windowClients) => {
       for (let client of windowClients) {
