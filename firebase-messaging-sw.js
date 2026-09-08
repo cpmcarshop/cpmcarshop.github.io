@@ -12,18 +12,22 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ★ バックグラウンドメッセージ（データメッセージ）の処理
-messaging.onBackgroundMessage((payload) => {
-  const data = payload.data || {};
-  const title = '🚗 新しい注文が入りました！';
-  const body =
-    `${data.buyerName || '購入者'} 様が ${data.carName || '車両'} を注文しました。\n` +
-    `グレード: ${data.gradeName || '未選択'}\n` +
-    `カラー: ${data.colorName || '未選択'}\n` +
-    `オプション: ${data.options || 'なし'}\n` +
-    `合計金額: ${data.totalPrice || '0'} CR\n` +
-    `クーポン: ${data.couponApplied || 'なし'}\n` +
-    `注文ID: ${data.orderId || '不明'}`;
+messaging.onBackgroundMessage(function(payload) {
+  console.log('[SW] バックグラウンドメッセージ受信:', payload);
+
+  var data = payload.data || {};
+  var title = '🚗 新しい注文が入りました！';
+
+  // ★ 文字列連結（+演算子）で安全に組み立てる ★
+  var body = '';
+  body = body + (data.buyerName || '購入者') + ' 様が ';
+  body = body + (data.carName || '車両') + ' を注文しました。\n';
+  body = body + 'グレード: ' + (data.gradeName || '未選択') + '\n';
+  body = body + 'カラー: ' + (data.colorName || '未選択') + '\n';
+  body = body + 'オプション: ' + (data.options || 'なし') + '\n';
+  body = body + '合計金額: ' + (data.totalPrice || '0') + ' CR\n';
+  body = body + 'クーポン: ' + (data.couponApplied || 'なし') + '\n';
+  body = body + '注文ID: ' + (data.orderId || '不明');
 
   self.registration.showNotification(title, {
     body: body,
@@ -32,20 +36,19 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// ★ 通知クリック時の処理
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || 'https://twitter.com';
-
+  var url = event.notification.data && event.notification.data.url || 'https://twitter.com';
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((windowClients) => {
-      for (let client of windowClients) {
-        if (client.url === urlToOpen && 'focus' in client) {
+    clients.matchAll({ type: 'window' }).then(function(windowClients) {
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url === url && 'focus' in client) {
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(url);
       }
     })
   );
