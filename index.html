@@ -2799,8 +2799,8 @@ window._currentMaker = maker;
   }
 
   // ★ 自社車両一覧を先に取得（セレクトボックス用）
-  const result = await callGasApi('getCars', { makerId: maker.makerId });
-const myCars = result.cars || [];
+const result = await callGasApi('getCars', { makerId: maker.makerId });
+const myCars = (result && result.cars) ? result.cars : [];  // ★ 安全に
 const enrichedCars = await enrichCarsWithMakerIcons(myCars);
 
 
