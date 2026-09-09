@@ -1327,7 +1327,7 @@ async function showMyOrders() {
 }
     // ★ 車両データにメーカーアイコンを追加する関数
 async function enrichCarsWithMakerIcons(cars) {
-  if (!cars || cars.length === 0) return cars;
+   if (!cars || !Array.isArray(cars) || cars.length === 0) return [];
 
   // メーカー一覧を取得（キャッシュが効くので高速）
   const makers = await callGasApi('getMakers', {}, true);
@@ -1446,7 +1446,7 @@ if (result && result.banned) {
   window.location.href = url;
   return null;
 }
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'API呼び出しに失敗しました');
     
     apiCache[cacheKey] = {
       data: result.data,
@@ -1515,18 +1515,17 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
 
   // ★ ホームタブの場合
   if (tabId === 'home') {
-    const cacheKey = 'getCars{"sortBy":"view"}';
-    const cached = apiCache[cacheKey];
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      // ★ キャッシュのデータにアイコンを付与してから表示
-      const enrichedCached = await enrichCarsWithMakerIcons(cached.data.cars);
-      renderCarGrid('home-car-grid', enrichedCached);
-      return;
-    }
-    // キャッシュがなければ読み込み
-    await loadHomeCars();
+  const cacheKey = 'getCars{"sortBy":"view"}';
+  const cached = apiCache[cacheKey];
+  // ★★★ cached.data.cars の存在確認を追加 ★★★
+  if (cached && cached.data && cached.data.cars && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    const enrichedCached = await enrichCarsWithMakerIcons(cached.data.cars);
+    renderCarGrid('home-car-grid', enrichedCached);
     return;
   }
+  await loadHomeCars();
+  return;
+}
 
   // その他タブは従来通り
   if (tabId === 'search') {
@@ -2151,6 +2150,13 @@ return `
  // 1枚目(img1)をメイン画像として描画（showRank オプション追加）
 function renderCarGrid(targetId, cars, isMyCars = false, showRank = false, append = false) {
   const grid = document.getElementById(targetId);
+  if (!grid) return;
+
+  // ★★★ ここに追加（配列チェック） ★★★
+  if (!cars || !Array.isArray(cars) || cars.length === 0) {
+    grid.innerHTML = `<p style="color:#888; grid-column: 1 / -1; text-align:center;">表示できる車両がありません。</p>`;
+    return;
+  }
   const html = cars.map((c, index) => {
     const rank = index + 1;
     let rankBadge = '';
