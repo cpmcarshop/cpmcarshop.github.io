@@ -1295,8 +1295,15 @@ async function showMyOrders() {
   container.innerHTML = '読み込み中...';
   
   const result = await callGasApi('getUserOrders', { uid: window.currentUser.uid });
-  if (!result || !result.orders) {
-    container.innerHTML = '<p style="color:#888;">注文履歴の取得に失敗しました。</p>';
+  
+  // ★ エラーの詳細を表示
+  if (!result) {
+    const errMsg = window._lastApiError || '原因不明のエラー';
+    container.innerHTML = `<p style="color:#e94560;">注文履歴の取得に失敗しました。<br>エラー詳細: ${errMsg}</p>`;
+    return;
+  }
+  if (!result.orders) {
+    container.innerHTML = '<p style="color:#888;">注文履歴の取得に失敗しました（データ形式が不正です）。</p>';
     return;
   }
   if (result.orders.length === 0) {
@@ -2698,8 +2705,22 @@ async function executePurchase() {
     }
 
     // 成功時
-    alert(orderRes.message || '注文が確定しました！');
-    closeModal('detail-modal');
+    // 注文成功時（alert の後）
+alert(orderRes.message || '注文が確定しました！');
+
+// ★★★ ここから DM 案内を追加 ★★★
+const makerTwitterId = currentCarDetail.maker?.twitterId;
+if (makerTwitterId) {
+  const grade = document.getElementById('buy-grade').value;
+  const color = document.getElementById('buy-color').value;
+  const options = [];
+  document.querySelectorAll('.buy-option-cb:checked').forEach(cb => options.push(cb.dataset.name));
+  const dmMessage = `架空車街から購入希望です！\n車種: ${currentCarDetail.carName}\nグレード: ${grade}\nカラー: ${color}\nオプション: ${options.join(', ')}\n注文ID: ${orderRes.orderId || ''}`;
+  openTwitterDmModal(dmMessage, makerTwitterId, orderRes.orderId);
+} else {
+  alert('メーカーの Twitter ID が設定されていないため、DM を送信できません。');
+}
+closeModal('detail-modal');
 
   } catch (e) {
     // 万一の予期せぬエラー
@@ -2846,7 +2867,6 @@ statusArea.innerHTML = `
   `;
 
   statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
-loadPushSettings();// 注文・通知一覧（既存）
 const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
 const orderList = document.getElementById('orders-notification-list');
 if (orderRes && orderRes.orders.length > 0) {
