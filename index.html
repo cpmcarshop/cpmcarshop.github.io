@@ -56,6 +56,7 @@ async function openDealBoard(orderId) {
   currentDealOrderId = orderId;
   lastDealBoardTimestamp = null;
   renderedDealLogIds = new Set();  // ★ 追加: リセット
+  window._dealBoardMyRole = null;  // ★ 追加: 自分のロールを保持
 
   document.getElementById('deal-board-modal').style.display = 'flex';
   document.getElementById('deal-board-history').innerHTML = '<p style="color:#888; text-align:center;">読み込み中...</p>';
@@ -76,6 +77,9 @@ async function loadDealBoard() {
       '<p style="color:#e94560; text-align:center;">連絡履歴の取得に失敗しました。</p>';
     return;
   }
+
+  // ★ 自分のロールを記憶（楽観的表示で使う）
+  window._dealBoardMyRole = result.myRole || null;
 
   renderDealBoardLogs(result.logs, false);
 
@@ -111,9 +115,6 @@ function renderDealBoardLogs(logs, append) {
   const placeholder = history.querySelector('p');
   if (placeholder) placeholder.remove();
 
-  // ★ 描画前に最下部にいたか判定
-  const wasAtBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 80;
-
   // ★ 新規ログのみHTML化（古い順の配列をそのまま下に追加）
   const html = newLogs.map(log => {
     renderedDealLogIds.add(log.logId);  // 描画済みとして登録
@@ -122,7 +123,7 @@ function renderDealBoardLogs(logs, append) {
     const color = isOwn ? '#000' : '#fff';
     const roleLabel = log.senderRole === 'buyer' ? '購入者' : 'メーカー';
     return `
-      <div class="deal-bubble ${isOwn ? 'own' : 'other'}" style="display:flex; justify-content:${isOwn ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+      <div class="deal-bubble ${isOwn ? 'own' : 'other'}" data-log-id="${log.logId}" style="display:flex; justify-content:${isOwn ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
         <div style="max-width:70%; background:${bg}; color:${color}; padding:8px 12px; border-radius:12px; word-break:break-word;">
           <div style="font-size:0.7rem; opacity:0.7;">${roleLabel}</div>
           <div style="white-space:pre-wrap;">${log.content}</div>
@@ -234,6 +235,18 @@ async function submitDealContent() {
     btn.style.cursor = 'not-allowed';
   }
 
+  // ★ 楽観的UI: 送信前にローカル描画（仮IDで表示）
+  const tempLogId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  const optimisticLog = {
+    logId: tempLogId,
+    senderUid: window.currentUser.uid,
+    senderRole: window._dealBoardMyRole || 'buyer',
+    content: content,
+    createdAt: new Date().toISOString()
+  };
+  renderDealBoardLogs([optimisticLog], true);
+  input.value = '';   // 入力欄は即クリア
+
   try {
     const result = await callGasApi('saveDealContent', {
       orderId: currentDealOrderId,
@@ -242,14 +255,22 @@ async function submitDealContent() {
     }, false);
 
     if (!result) {
+      // ★ 失敗時: 楽観的表示を取り消して、入力を復元
+      removeDealBoardLog(tempLogId);
+      input.value = content;
       alert(window._lastApiError || '連絡内容の記録に失敗しました');
       return;
     }
 
-    input.value = '';
-
-    // ★ サーバーから最新を取得（重複防止Setがあるので安全）
-    await loadDealBoard();
+    // ★ 成功時: 仮IDをサーバー発行IDに置き換え
+    //   → 次ポーリングで同じメッセージが来ても renderedDealLogIds で弾かれる
+    if (result.logId) {
+      renderedDealLogIds.delete(tempLogId);
+      renderedDealLogIds.add(result.logId);
+      const el = document.querySelector(`[data-log-id="${tempLogId}"]`);
+      if (el) el.setAttribute('data-log-id', result.logId);
+    }
+    // ★ ここで loadDealBoard() は呼ばない（即時性のため）
   } finally {
     _isSubmittingDeal = false;
     if (btn) {
@@ -258,6 +279,17 @@ async function submitDealContent() {
       btn.style.opacity = '1';
       btn.style.cursor = 'pointer';
     }
+  }
+}
+
+// ★ 楽観的表示を取り消すヘルパー（失敗時のみ使用）
+function removeDealBoardLog(logId) {
+  renderedDealLogIds.delete(logId);
+  const el = document.querySelector(`[data-log-id="${logId}"]`);
+  if (el) el.remove();
+  const history = document.getElementById('deal-board-history');
+  if (history && history.children.length === 0) {
+    history.innerHTML = '<p style="color:#888; text-align:center;">まだ連絡内容はありません。</p>';
   }
 }
 async function markDealBoardRead() {
