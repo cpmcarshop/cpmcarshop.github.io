@@ -46,6 +46,7 @@
 let currentDealOrderId = null;
 let dealBoardPollingTimer = null;
 let lastDealBoardTimestamp = null;
+let renderedDealLogIds = new Set();  // ★ 追加: 描画済みログID
 
 async function openDealBoard(orderId) {
   if (!window.currentUser) {
@@ -54,6 +55,7 @@ async function openDealBoard(orderId) {
   }
   currentDealOrderId = orderId;
   lastDealBoardTimestamp = null;
+  renderedDealLogIds = new Set();  // ★ 追加: リセット
 
   document.getElementById('deal-board-modal').style.display = 'flex';
   document.getElementById('deal-board-history').innerHTML = '<p style="color:#888; text-align:center;">読み込み中...</p>';
@@ -78,6 +80,7 @@ async function loadDealBoard() {
   renderDealBoardLogs(result.logs, false);
 
   if (result.logs.length > 0) {
+    // ★ 古い順なので最後の要素が最新
     lastDealBoardTimestamp = result.logs[result.logs.length - 1].createdAt;
   }
 
@@ -87,18 +90,33 @@ async function loadDealBoard() {
 function renderDealBoardLogs(logs, append) {
   const history = document.getElementById('deal-board-history');
 
+  // ★ 初回は全クリア
   if (!append) {
     history.innerHTML = '';
+    renderedDealLogIds.clear();
   }
 
-  if (logs.length === 0 && !append) {
-    history.innerHTML = '<p style="color:#888; text-align:center;">まだ連絡内容はありません。</p>';
+  // ★ 既に描画済みのIDを除外（重複防止）
+  const newLogs = logs.filter(log => !renderedDealLogIds.has(log.logId));
+
+  // ★ 新規ログがゼロ
+  if (newLogs.length === 0) {
+    if (history.children.length === 0) {
+      history.innerHTML = '<p style="color:#888; text-align:center;">まだ連絡内容はありません。</p>';
+    }
     return;
   }
 
-  const wasAtBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 50;
+  // ★ プレースホルダ（「まだ連絡内容はありません」）を削除
+  const placeholder = history.querySelector('p');
+  if (placeholder) placeholder.remove();
 
-  const html = logs.map(log => {
+  // ★ 描画前に最下部にいたか判定
+  const wasAtBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 80;
+
+  // ★ 新規ログのみHTML化（古い順の配列をそのまま下に追加）
+  const html = newLogs.map(log => {
+    renderedDealLogIds.add(log.logId);  // 描画済みとして登録
     const isOwn = log.senderUid === window.currentUser.uid;
     const bg = isOwn ? '#00d2ff' : '#2a2a4a';
     const color = isOwn ? '#000' : '#fff';
@@ -114,16 +132,11 @@ function renderDealBoardLogs(logs, append) {
     `;
   }).join('');
 
-  if (append) {
-    history.insertAdjacentHTML('beforeend', html);
-  } else {
-    history.innerHTML = html;
-  }
+  // ★ 常に下に追加（新しいのが下に来る）
+  history.insertAdjacentHTML('beforeend', html);
 
-  // 最下部にいた場合のみ自動スクロール
-  if (!append || wasAtBottom) {
-    history.scrollTop = history.scrollHeight;
-  }
+  // ★ 新着時は常に最下部へスクロール
+  history.scrollTop = history.scrollHeight;
 }
 
 function formatDealTime(isoString) {
@@ -157,7 +170,15 @@ function applyDealBoardLock(locked) {
 function startDealBoardPolling() {
   stopDealBoardPolling();
   dealBoardPollingTimer = setInterval(async () => {
-    if (!currentDealOrderId) return;
+    // ★ モーダルが閉じていたら停止
+    const modal = document.getElementById('deal-board-modal');
+    if (!currentDealOrderId || !modal || modal.style.display !== 'flex') {
+      stopDealBoardPolling();
+      return;
+    }
+
+    // ★ 送信中はスキップ（自分の送信と競合しないよう）
+    if (_isSubmittingDeal) return;
 
     const result = await callGasApi('getDealBoardSince', {
       orderId: currentDealOrderId,
@@ -193,32 +214,52 @@ async function closeDealBoard() {
   closeModal('deal-board-modal');
 }
 
+let _isSubmittingDeal = false;  // ★ 二重送信防止フラグ
+
 async function submitDealContent() {
+  // ★ 二重送信防止
+  if (_isSubmittingDeal) return;
+
   const input = document.getElementById('deal-content');
   const content = input.value.trim();
   if (!content) return;
 
+  _isSubmittingDeal = true;
+
   const btn = document.querySelector('#deal-board-input-area .btn');
-  if (btn) { btn.disabled = true; }
-
-  const result = await callGasApi('saveDealContent', {
-    orderId: currentDealOrderId,
-    uid: window.currentUser.uid,
-    content: content
-  }, false);
-
-  if (btn) { btn.disabled = false; }
-
-  if (!result) {
-    alert(window._lastApiError || '連絡内容の記録に失敗しました');
-    return;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';       // 送信中表示
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
   }
 
-  input.value = '';
-  // 自分の送信はすぐに反映
-  await loadDealBoard();
-}
+  try {
+    const result = await callGasApi('saveDealContent', {
+      orderId: currentDealOrderId,
+      uid: window.currentUser.uid,
+      content: content
+    }, false);
 
+    if (!result) {
+      alert(window._lastApiError || '連絡内容の記録に失敗しました');
+      return;
+    }
+
+    input.value = '';
+
+    // ★ サーバーから最新を取得（重複防止Setがあるので安全）
+    await loadDealBoard();
+  } finally {
+    _isSubmittingDeal = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '▶';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    }
+  }
+}
 async function markDealBoardRead() {
   if (!currentDealOrderId) return;
   await callGasApi('markDealBoardRead', {
