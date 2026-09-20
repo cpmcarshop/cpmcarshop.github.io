@@ -35,7 +35,275 @@
   "alternateName": ["CPM架空車総合ポータル", "架空車街 Produced by MPEK Group"],
   "url": "https://cpmcarshop.github.io/"
 }
-</script>
+
+     </script>  <!-- ★ ここで一回閉じる -->
+
+  <script>
+
+    // ============================================================
+// 取引ボード（ 画面）
+// ============================================================
+let currentDealOrderId = null;
+let dealBoardPollingTimer = null;
+let lastDealBoardTimestamp = null;
+
+async function openDealBoard(orderId) {
+  if (!window.currentUser) {
+    alert('ログインしてください。');
+    return;
+  }
+  currentDealOrderId = orderId;
+  lastDealBoardTimestamp = null;
+
+  document.getElementById('deal-board-modal').style.display = 'flex';
+  document.getElementById('deal-board-history').innerHTML = '<p style="color:#888; text-align:center;">読み込み中...</p>';
+
+  await loadDealBoard();
+  startDealBoardPolling();
+  await markDealBoardRead();
+}
+
+async function loadDealBoard() {
+  const result = await callGasApi('getDealBoard', {
+    orderId: currentDealOrderId,
+    uid: window.currentUser.uid
+  }, false);
+
+  if (!result || !result.logs) {
+    document.getElementById('deal-board-history').innerHTML =
+      '<p style="color:#e94560; text-align:center;">連絡履歴の取得に失敗しました。</p>';
+    return;
+  }
+
+  renderDealBoardLogs(result.logs, false);
+
+  if (result.logs.length > 0) {
+    lastDealBoardTimestamp = result.logs[result.logs.length - 1].createdAt;
+  }
+
+  applyDealBoardLock(result.locked);
+}
+
+function renderDealBoardLogs(logs, append) {
+  const history = document.getElementById('deal-board-history');
+
+  if (!append) {
+    history.innerHTML = '';
+  }
+
+  if (logs.length === 0 && !append) {
+    history.innerHTML = '<p style="color:#888; text-align:center;">まだ連絡内容はありません。</p>';
+    return;
+  }
+
+  const wasAtBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 50;
+
+  const html = logs.map(log => {
+    const isOwn = log.senderUid === window.currentUser.uid;
+    const bg = isOwn ? '#00d2ff' : '#2a2a4a';
+    const color = isOwn ? '#000' : '#fff';
+    const roleLabel = log.senderRole === 'buyer' ? '購入者' : 'メーカー';
+    return `
+      <div class="deal-bubble ${isOwn ? 'own' : 'other'}" style="display:flex; justify-content:${isOwn ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+        <div style="max-width:70%; background:${bg}; color:${color}; padding:8px 12px; border-radius:12px; word-break:break-word;">
+          <div style="font-size:0.7rem; opacity:0.7;">${roleLabel}</div>
+          <div style="white-space:pre-wrap;">${log.content}</div>
+          <div style="font-size:0.7rem; opacity:0.7; text-align:right; margin-top:4px;">${formatDealTime(log.createdAt)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (append) {
+    history.insertAdjacentHTML('beforeend', html);
+  } else {
+    history.innerHTML = html;
+  }
+
+  // 最下部にいた場合のみ自動スクロール
+  if (!append || wasAtBottom) {
+    history.scrollTop = history.scrollHeight;
+  }
+}
+
+function formatDealTime(isoString) {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const hour = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${month}/${day} ${hour}:${min}`;
+  } catch (e) {
+    return isoString;
+  }
+}
+
+function applyDealBoardLock(locked) {
+  const banner = document.getElementById('deal-board-locked-banner');
+  const inputArea = document.getElementById('deal-board-input-area');
+  if (locked) {
+    banner.style.display = 'block';
+    inputArea.style.display = 'none';
+    stopDealBoardPolling();
+  } else {
+    banner.style.display = 'none';
+    inputArea.style.display = 'flex';
+  }
+}
+
+// ---- ポーリング（5秒ごと差分取得） ----
+function startDealBoardPolling() {
+  stopDealBoardPolling();
+  dealBoardPollingTimer = setInterval(async () => {
+    if (!currentDealOrderId) return;
+
+    const result = await callGasApi('getDealBoardSince', {
+      orderId: currentDealOrderId,
+      uid: window.currentUser.uid,
+      since: lastDealBoardTimestamp
+    }, false);
+
+    if (!result) return;
+
+    if (result.logs && result.logs.length > 0) {
+      renderDealBoardLogs(result.logs, true);
+      lastDealBoardTimestamp = result.logs[result.logs.length - 1].createdAt;
+      await markDealBoardRead();
+    }
+
+    if (result.locked) {
+      applyDealBoardLock(true);
+    }
+  }, 5000);
+}
+
+function stopDealBoardPolling() {
+  if (dealBoardPollingTimer) {
+    clearInterval(dealBoardPollingTimer);
+    dealBoardPollingTimer = null;
+  }
+}
+
+async function closeDealBoard() {
+  stopDealBoardPolling();
+  currentDealOrderId = null;
+  lastDealBoardTimestamp = null;
+  closeModal('deal-board-modal');
+}
+
+async function submitDealContent() {
+  const input = document.getElementById('deal-content');
+  const content = input.value.trim();
+  if (!content) return;
+
+  const btn = document.querySelector('#deal-board-input-area .btn');
+  if (btn) { btn.disabled = true; }
+
+  const result = await callGasApi('saveDealContent', {
+    orderId: currentDealOrderId,
+    uid: window.currentUser.uid,
+    content: content
+  }, false);
+
+  if (btn) { btn.disabled = false; }
+
+  if (!result) {
+    alert(window._lastApiError || '連絡内容の記録に失敗しました');
+    return;
+  }
+
+  input.value = '';
+  // 自分の送信はすぐに反映
+  await loadDealBoard();
+}
+
+async function markDealBoardRead() {
+  if (!currentDealOrderId) return;
+  await callGasApi('markDealBoardRead', {
+    orderId: currentDealOrderId,
+    uid: window.currentUser.uid
+  }, false);
+  await updateDealBoardBadge();
+}
+
+// ---- 未読バッジ ----
+async function updateDealBoardBadge() {
+  if (!window.currentUser) return;
+  const result = await callGasApi('getDealBoardUnreadCount', {
+    uid: window.currentUser.uid
+  }, false);
+  const badge = document.getElementById('deal-board-badge');
+  if (!badge) return;
+  if (result && result.count > 0) {
+    badge.style.display = 'inline-block';
+    badge.innerText = result.count > 99 ? '99+' : result.count;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ---- 取引ボード一覧 ----
+async function openDealBoardList() {
+  if (!window.currentUser) {
+    alert('ログインしてください。');
+    return;
+  }
+  document.getElementById('deal-board-list-modal').style.display = 'flex';
+  await loadDealBoardList();
+}
+ 
+async function loadDealBoardList() {
+  const container = document.getElementById('deal-board-list-container');
+  container.innerHTML = '<p style="color:#888; text-align:center;">読み込み中...</p>';
+
+  const [userOrdersRes, makerOrdersRes] = await Promise.all([
+    callGasApi('getUserOrders', { uid: window.currentUser.uid }, false),
+    callGasApi('getMakerOrders', { uid: window.currentUser.uid }, false)
+  ]);
+
+  const userOrders = (userOrdersRes && userOrdersRes.orders) ? userOrdersRes.orders : [];
+  const makerOrders = (makerOrdersRes && makerOrdersRes.orders) ? makerOrdersRes.orders : [];
+
+  const allOrders = [];
+  const seenIds = new Set();
+  [...userOrders, ...makerOrders].forEach(o => {
+    if (seenIds.has(o.orderId)) return;
+    seenIds.add(o.orderId);
+    if (o.status === '納車完了') return;
+    allOrders.push(o);
+  });
+
+  if (allOrders.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center;">進行中の取引はありません。</p>';
+    return;
+  }
+
+  container.innerHTML = allOrders.map(o => {
+    const isBuyer = userOrders.some(u => u.orderId === o.orderId);
+    const role = isBuyer ? '購入者' : 'メーカー';
+    const roleColor = isBuyer ? '#00d2ff' : '#ffd700';
+    return `
+      <div class="notif-box" style="cursor:pointer;" onclick="closeModal('deal-board-list-modal'); openDealBoard('${o.orderId}')">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong>${o.carName || '不明な車両'}</strong>
+            <span style="color:${roleColor}; font-size:0.8rem; margin-left:8px;">[${role}]</span>
+            <br>
+            <span style="font-size:0.85rem; color:#aaa;">相手: ${isBuyer ? 'メーカー' : (o.buyerName || '不明')}</span>
+            <br>
+            <span style="font-size:0.75rem; color:#888;">注文ID: ${o.orderId}</span>
+          </div>
+          <div style="font-size:1.5rem; color:#00d2ff;">›</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+ </script>
+    
+
 <!-- Twitterカードの設定 -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@MPEK_Group" />
@@ -760,6 +1028,23 @@ input:checked + .slider:before {
   transform: translateX(20px);
 }
 
+    /* 取引ボード 吹き出し */
+.deal-bubble {
+  animation: dealBubbleIn 0.2s ease-out;
+}
+@keyframes dealBubbleIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 未読バッジ */
+#deal-board-badge {
+  animation: dealBadgePulse 1.5s ease-in-out infinite;
+}
+@keyframes dealBadgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
   </style>
 </head>
 <body>
@@ -817,7 +1102,10 @@ input:checked + .slider:before {
       </div>
     </div>
     <!-- ★ ここまで -->
-
+<button class="btn btn-secondary" id="deal-board-nav-btn" onclick="openDealBoardList()" style="position:relative; margin-right:5px; display:none;">
+  取引ボード
+  <span id="deal-board-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#e94560; color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight:bold;">0</span>
+</button>
     <button class="btn" id="auth-btn">ログイン / 登録</button>
   </div>
 </header>
@@ -1059,9 +1347,10 @@ input:checked + .slider:before {
       <label>メッセージ内容（編集可能）</label>
       <textarea id="dm-message" rows="6" style="width:100%; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px; padding:8px;"></textarea>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn" onclick="copyDmMessage()">📋 コピー</button>
       <button class="btn" onclick="sendDm()" style="background:#1DA1F2; color:#fff;">🐦 DMをする</button>
+      <button class="btn" id="dm-open-deal-board-btn" style="background:#00d2ff; color:#000; display:none;">📋 取引ボードを開く</button>
       <button class="btn btn-secondary" onclick="closeModal('twitter-dm-modal')">閉じる</button>
     </div>
   </div>
@@ -1162,7 +1451,9 @@ const auth = getAuth(app);
     document.getElementById('user-display-name').innerText = '認証中...';
     document.getElementById('auth-btn').innerText = '管理';
     document.getElementById('mypage-tab').classList.add('is-visible');
-
+document.getElementById('deal-board-nav-btn').style.display = 'inline-block';
+setTimeout(() => updateDealBoardBadge(), 1000);
+setInterval(() => updateDealBoardBadge(), 30000);
     // ★ registerUser を強制更新（キャッシュを無視）
     const userInfo = await callGasApi('registerUser', {
       uid: user.uid,
@@ -1204,8 +1495,10 @@ const auth = getAuth(app);
     document.getElementById('user-display-name').innerText = '';
     document.getElementById('auth-btn').innerText = 'ログイン / 登録';
     document.getElementById('mypage-tab').classList.remove('is-visible');
+    document.getElementById('deal-board-nav-btn').style.display = 'none';
   }
 });
+  
 </script>
 
   <script>
@@ -1320,7 +1613,8 @@ async function showMyOrders() {
         グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
         合計金額: ${Number(o.totalPrice).toLocaleString()} CR<br>
         ステータス: <strong>${o.status}</strong><br>
-        注文日: ${o.createdAt}
+       注文日: ${o.createdAt}
+      <br><button class="btn btn-secondary" style="margin-top:5px;" onclick="openDealBoard('${o.orderId}')">📋 取引ボード${o.status === '納車完了' ? '（完了）' : ''}</button>
       </div>
     `;
   }).join('');
@@ -2886,6 +3180,8 @@ if (orderRes && orderRes.orders.length > 0) {
       合計金額: ${Number(o.totalPrice).toLocaleString()} CR | ステータス: <strong>${o.status}</strong>
       ${o.status === '注文済' ? `<br><button class="btn" style="margin-top:5px;" onclick="confirmDelivery('${o.orderId}')">納車完了として処理する</button>` : ''}
       ${o.status === '納車完了' ? `<br><button class="btn btn-danger" style="margin-top:5px;" onclick="deleteOrder('${o.orderId}')">🗑 削除</button>` : ''}
+<br><button class="btn btn-secondary" style="margin-top:5px;" onclick="openDealBoard('${o.orderId}')">📋 取引ボード${o.status === '納車完了' ? '（完了）' : ''}</button>
+
     </div>
   `;
 }).join('');
@@ -2969,6 +3265,22 @@ function openTwitterDmModal(message, twitterId, orderId = null) {
   if (orderInfo) {
     orderInfo.innerText = orderId ? `注文ID: ${orderId}` : '';
   }
+
+  // ★★★ ここを追加：取引ボードボタンを動的に設定 ★★★
+  const dealBtn = document.getElementById('dm-open-deal-board-btn');
+  if (dealBtn) {
+    if (orderId) {
+      dealBtn.style.display = 'inline-block';
+      dealBtn.onclick = function() {
+        closeModal('twitter-dm-modal');
+        openDealBoard(orderId);
+      };
+    } else {
+      dealBtn.style.display = 'none';
+      dealBtn.onclick = null;
+    }
+  }
+  // ★★★ ここまで ★★★
 
   // ★ 自動コピー + トースト
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -4214,6 +4526,7 @@ loadAnnouncement(); // ★ 追加
   }, 500);
 })(); 
   </script>
+
   
   <footer style="text-align: center; padding: 20px; font-size: 0.85rem; color: #666; border-top: 1px solid #16213e; margin-top: 40px;">
   <p>&copy; 2026 架空車街 Produced by MPEK Group</p>
@@ -4358,5 +4671,35 @@ loadAnnouncement(); // ★ 追加
       <div id="editor-status" style="font-size: 0.85rem; color: #aaa; margin-top: 10px;"></div>
     </div>
   </div>
+
+  <!-- ===== 取引ボード  画面モーダル ===== -->
+<div id="deal-board-modal" class="modal">
+  <div class="modal-content" style="max-width:600px; display:flex; flex-direction:column; max-height:90vh;">
+    <h3 style="margin:0 0 5px 0;">📋 取引ボード</h3>
+    <div id="deal-board-order-info" style="font-size:0.8rem; color:#aaa; margin-bottom:8px;"></div>
+    <div id="deal-board-locked-banner" style="display:none; background:#e94560; color:#fff; padding:8px; border-radius:4px; margin-bottom:10px; font-size:0.85rem;">
+      この取引は完了しているため、閲覧のみ可能です。
+    </div>
+    <div id="deal-board-history" style="flex:1; overflow-y:auto; padding:8px; background:#0a0c1b; border-radius:6px; min-height:200px; max-height:50vh;"></div>
+    <div id="deal-board-input-area" style="display:flex; gap:8px; align-items:flex-end; margin-top:10px;">
+      <textarea id="deal-content" placeholder="連絡内容を入力..." rows="2" style="flex:1; padding:8px; background:#0f1428; color:#fff; border:1px solid #333; border-radius:4px; resize:vertical;"></textarea>
+      <button class="btn" onclick="submitDealContent()" style="padding:8px 20px; font-size:1.1rem;">▶</button>
+    </div>
+    <div style="text-align:right; margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeDealBoard()">閉じる</button>
+    </div>
+  </div>
+</div>
+  <!-- ===== 取引ボード一覧モーダル ===== -->
+<div id="deal-board-list-modal" class="modal">
+  <div class="modal-content" style="max-width:600px;">
+    <h3>📋 取引ボード一覧</h3>
+    <p style="color:#aaa; font-size:0.9rem;">進行中の取引の連絡ボードです。</p>
+    <div id="deal-board-list-container" style="max-height:60vh; overflow-y:auto;"></div>
+    <div style="text-align:right; margin-top:10px;">
+      <button class="btn btn-secondary" onclick="closeModal('deal-board-list-modal')">閉じる</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
