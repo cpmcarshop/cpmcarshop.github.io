@@ -299,10 +299,9 @@ async function loadDealBoardList() {
   const container = document.getElementById('deal-board-list-container');
   container.innerHTML = '<p style="color:#888; text-align:center;">読み込み中...</p>';
 
-  const [userOrdersRes, makerOrdersRes] = await Promise.all([
-    callGasApi('getUserOrders', { uid: window.currentUser.uid }, false),
-    callGasApi('getMakerOrders', { uid: window.currentUser.uid }, false)
-  ]);
+  // ★ 順番に呼ぶ（同時に呼ばない）
+  const userOrdersRes = await callGasApi('getUserOrders', { uid: window.currentUser.uid }, false);
+  const makerOrdersRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid }, false);
 
   const userOrders = (userOrdersRes && userOrdersRes.orders) ? userOrdersRes.orders : [];
   const makerOrders = (makerOrdersRes && makerOrdersRes.orders) ? makerOrdersRes.orders : [];
@@ -1493,8 +1492,8 @@ const auth = getAuth(app);
     document.getElementById('auth-btn').innerText = '管理';
     document.getElementById('mypage-tab').classList.add('is-visible');
 document.getElementById('deal-board-nav-btn').style.display = 'inline-block';
-setTimeout(() => updateDealBoardBadge(), 1000);
-setInterval(() => updateDealBoardBadge(), 30000);
+setTimeout(() => updateDealBoardBadge(), 3000);
+setInterval(() => updateDealBoardBadge(), 60000);  // ★ 60秒に
     // ★ registerUser を強制更新（キャッシュを無視）
     const userInfo = await callGasApi('registerUser', {
       uid: user.uid,
@@ -1544,7 +1543,8 @@ setInterval(() => updateDealBoardBadge(), 30000);
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxv9-_xWXwFtD-bY-de5r65KkLI-JSTwLE2ebe98RbAyzWClSvrDxJoo6XD7gs1hS00/exec"; // GASのWebアプリURL
-let currentAbortController = null;
+let currentAbortController =const currentAbortControllers = {};   // ★ action ごとに保持
+ null;
     let currentSelectedMakerId = null; // メーカー選択フィルター状態
 
     // ローディング状態管理カウンター
@@ -1750,11 +1750,14 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     console.log('キャッシュ使用: ' + action);
     return apiCache[cacheKey].data;
   }
-  if (!isInitialLoad && currentAbortController) {
-    currentAbortController.abort();
+
+  // ★ 同じ action の前回通信だけをキャンセル（他は潰さない）
+  if (currentAbortControllers[action]) {
+    currentAbortControllers[action].abort();
   }
-  currentAbortController = new AbortController();
-  const signal = currentAbortController.signal;
+  const controller = new AbortController();
+  currentAbortControllers[action] = controller;
+  const signal = controller.signal;
 
   // ★ showLoadingFlag が true の場合のみローディング表示
   if (showLoadingFlag) {
@@ -1803,8 +1806,9 @@ if (result && result.banned) {
     if (showLoadingFlag) {
       hideLoading();
     }
-    if (currentAbortController && currentAbortController.signal === signal) {
-      currentAbortController = null;
+    // ★ 自分自身のコントローラをクリア
+    if (currentAbortControllers[action] === controller) {
+      delete currentAbortControllers[action];
     }
   }
 }
