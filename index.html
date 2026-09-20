@@ -198,7 +198,7 @@ function startDealBoardPolling() {
     if (result.locked) {
       applyDealBoardLock(true);
     }
-  }, 5000);
+  }, 10000);  // ★ 5000 → 10000 に変更（GASの同時実行制限対策）
 }
 
 function stopDealBoardPolling() {
@@ -226,6 +226,9 @@ async function submitDealContent() {
   if (!content) return;
 
   _isSubmittingDeal = true;
+
+  // ★★★ 追加: 送信中はポーリングを停止（GAS負荷・競合対策） ★★★
+  stopDealBoardPolling();
 
   const btn = document.querySelector('#deal-board-input-area .btn');
   if (btn) {
@@ -258,7 +261,13 @@ async function submitDealContent() {
       // ★ 失敗時: 楽観的表示を取り消して、入力を復元
       removeDealBoardLog(tempLogId);
       input.value = content;
-      alert(window._lastApiError || '連絡内容の記録に失敗しました');
+      // ★★★ 変更: 混雑系エラーは分かりやすく表示 ★★★
+      const errMsg = window._lastApiError || '連絡内容の記録に失敗しました';
+      if (errMsg.includes('混雑') || errMsg.includes('JSON') || errMsg.includes('HTTP')) {
+        alert('サーバーが混雑しています。数秒後にもう一度お試しください。\n（メッセージは入力欄に残しています）');
+      } else {
+        alert(errMsg);
+      }
       return;
     }
 
@@ -279,6 +288,13 @@ async function submitDealContent() {
       btn.style.opacity = '1';
       btn.style.cursor = 'pointer';
     }
+    // ★★★ 追加: 送信完了後にポーリングを再開（3秒後） ★★★
+    setTimeout(() => {
+      const modal = document.getElementById('deal-board-modal');
+      if (currentDealOrderId && modal && modal.style.display === 'flex') {
+        startDealBoardPolling();
+      }
+    }, 3000);
   }
 }
 
@@ -1794,44 +1810,85 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     showLoading("サーバーと通信中...");
   }
 
-  try {
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action, payload }),
-      signal
-    });
-    const result = await res.json();
+  // ★★★ 追加: リトライ設定（書き込み系・取引ボード系はリトライする） ★★★
+  const RETRYABLE_ACTIONS = [
+    'saveDealContent', 'getDealBoard', 'getDealBoardSince',
+    'markDealBoardRead', 'getDealBoardUnreadCount'
+  ];
+  const MAX_RETRY = RETRYABLE_ACTIONS.includes(action) ? 2 : 0;
+  const RETRY_DELAY = 800;
 
-// callGasApi 内の BAN 検知部分を修正
-if (result && result.banned) {
-  for (let key in apiCache) { delete apiCache[key]; }
-  // GAS_URL は先頭で定義済み（例: const GAS_URL = "https://script.google.com/.../exec";）
-  let url = GAS_URL + '?page=goodbye';
-  if (result.remaining) {
-    url += '&days=' + encodeURIComponent(result.remaining);
-  }
-  window.location.href = url;
-  return null;
-}
-    if (!result.success) throw new Error(result.error || 'API呼び出しに失敗しました');
-    
-    apiCache[cacheKey] = {
-      data: result.data,
-      timestamp: now
-    };
-    return result.data;
-  // callGasApi 関数内の catch ブロックを以下のように修正
-} catch (e) {
-  if (e.name === 'AbortError') {
-    console.log('リクエストキャンセル: ' + action);
+  try {
+    for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+      try {
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action, payload }),
+          signal
+        });
+
+        // ★★★ 追加: HTTPステータスチェック ★★★
+        if (!res.ok) {
+          throw new Error('HTTPエラー: ' + res.status + ' ' + res.statusText);
+        }
+
+        // ★★★ 追加: レスポンスがJSONかどうかを先にテキストで確認 ★★★
+        const text = await res.text();
+        if (!text.trim().startsWith('{')) {
+          console.error('⚠️ 非JSONレスポンス (' + action + '):', text.substring(0, 200));
+          throw new Error('サーバーが混雑しています。数秒後にもう一度お試しください。');
+        }
+
+        let result;
+        try {
+          result = JSON.parse(text);
+        } catch (jsonErr) {
+          console.error('⚠️ JSON解析失敗 (' + action + '):', text.substring(0, 200));
+          throw new Error('サーバー応答の解析に失敗しました。');
+        }
+
+        // callGasApi 内の BAN 検知部分を修正
+        if (result && result.banned) {
+          for (let key in apiCache) { delete apiCache[key]; }
+          // GAS_URL は先頭で定義済み（例: const GAS_URL = "https://script.google.com/.../exec";）
+          let url = GAS_URL + '?page=goodbye';
+          if (result.remaining) {
+            url += '&days=' + encodeURIComponent(result.remaining);
+          }
+          window.location.href = url;
+          return null;
+        }
+        if (!result.success) throw new Error(result.error || 'API呼び出しに失敗しました');
+
+        apiCache[cacheKey] = {
+          data: result.data,
+          timestamp: now
+        };
+        return result.data;
+
+      // callGasApi 関数内の catch ブロックを以下のように修正
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          console.log('リクエストキャンセル: ' + action);
+          return null;
+        }
+
+        // ★★★ 追加: リトライ可能なら待機して再試行 ★★★
+        if (attempt < MAX_RETRY) {
+          console.warn(`⚠️ ${action} 失敗 (試行${attempt + 1}/${MAX_RETRY + 1}): ${e.message} → リトライ`);
+          await new Promise(r => setTimeout(r, RETRY_DELAY * (attempt + 1)));
+          continue;
+        }
+
+        console.error('APIエラー (' + action + '):', e.message);
+        // ★★★ この1行を追加（エラーメッセージを保存） ★★★
+        window._lastApiError = e.message;
+        return null;
+      }
+    }
     return null;
-  }
-  console.error('APIエラー (' + action + '):', e.message);
-  // ★★★ この1行を追加（エラーメッセージを保存） ★★★
-  window._lastApiError = e.message;
-  return null;
-} finally {
+  } finally {
     // ★ ローディング表示していた場合のみ非表示
     if (showLoadingFlag) {
       hideLoading();
