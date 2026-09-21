@@ -308,26 +308,90 @@ function removeDealBoardLog(logId) {
     history.innerHTML = '<p style="color:#888; text-align:center;">まだ連絡内容はありません。</p>';
   }
 }
-async function markDealBoardRead() {
-  if (!currentDealOrderId) return;
-  await callGasApi('markDealBoardRead', {
-    orderId: currentDealOrderId,
-    uid: window.currentUser.uid
-  }, false);
-  await updateDealBoardBadge();
+// ★★★ 追加: 取引ボード既読のローカル保存ヘルパー ★★★
+const DEAL_READ_LS_KEY = 'deal_board_read_map'; // { [orderId]: 'ISO timestamp' }
+
+function getDealReadMapLocal() {
+  try {
+    return JSON.parse(localStorage.getItem(DEAL_READ_LS_KEY) || '{}');
+  } catch (e) {
+    console.warn('既読マップ読み込み失敗', e);
+    return {};
+  }
 }
 
+function setDealReadLocal(orderId, ts) {
+  if (!orderId) return;
+  const map = getDealReadMapLocal();
+  map[orderId] = ts || new Date().toISOString();
+  try {
+    localStorage.setItem(DEAL_READ_LS_KEY, JSON.stringify(map));
+  } catch (e) {
+    console.warn('既読マップ保存失敗', e);
+  }
+}
+
+function getDealReadLocal(orderId) {
+  const map = getDealReadMapLocal();
+  return map[orderId] || null;
+}
+
+async function markDealBoardRead() {
+  if (!currentDealOrderId) return;
+  const orderId = currentDealOrderId;
+  const nowISO = new Date().toISOString();
+
+  // ① 【即時】ローカルストレージに保存（GASが失敗しても抑止できる）
+  setDealReadLocal(orderId, nowISO);
+
+  // ② 【即時】バッジを楽観的に更新（サーバー応答を待たない）
+  await updateDealBoardBadge();
+
+  // ③ 【バックグラウンド】GASへ既読を送信（失敗してもUIは既に更新済み）
+  try {
+    await callGasApi('markDealBoardRead', {
+      orderId: orderId,
+      uid: window.currentUser.uid
+    }, false, true);  // forceRefresh=true でキャッシュ無視
+  } catch (e) {
+    console.warn('GASへの既読送信失敗（ローカルには保存済み）', e);
+  }
+}
 // ---- 未読バッジ ----
 async function updateDealBoardBadge() {
   if (!window.currentUser) return;
+
+  // ★ forceRefresh=true で常に最新を取得（キャッシュ事故防止）
   const result = await callGasApi('getDealBoardUnreadCount', {
     uid: window.currentUser.uid
-  }, false);
+  }, false, true);
+
   const badge = document.getElementById('deal-board-badge');
   if (!badge) return;
-  if (result && result.count > 0) {
+
+  // ★ サーバーから取れなかった場合は現状維持（消してしまわない）
+  if (!result) return;
+
+  // ★★★ 追加: ローカル既読マップを反映してカウントを再計算 ★★★
+  const localMap = getDealReadMapLocal();
+  const serverOrders = result.orders || {};        // { orderId: 最新未読メッセージのタイムスタンプ }
+  const perOrderCount = result.perOrderCount || {}; // { orderId: 未読メッセージ数 }
+
+  let count = 0;
+  for (const orderId in serverOrders) {
+    const serverTs = serverOrders[orderId];
+    const localRead = localMap[orderId];
+
+    // ローカルの既読タイムスタンプ >= サーバーの最新未読タイムスタンプ なら既読扱い
+    if (localRead && new Date(localRead).getTime() >= new Date(serverTs).getTime()) {
+      continue;  // スキップ（＝ローカルで既読済み）
+    }
+    count += perOrderCount[orderId] || 1;
+  }
+
+  if (count > 0) {
     badge.style.display = 'inline-block';
-    badge.innerText = result.count > 99 ? '99+' : result.count;
+    badge.innerText = count > 99 ? '99+' : count;
   } else {
     badge.style.display = 'none';
   }
@@ -1789,7 +1853,11 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
   const now = Date.now();
 
   // ★ キャッシュを無視すべきアクション or forceRefresh が true ならキャッシュをスキップ
-  const NO_CACHE_ACTIONS = ['registerUser', 'getUserAnnouncements', 'getMakerByUid', 'getMyCoupons'];
+  const NO_CACHE_ACTIONS = [
+    'registerUser', 'getUserAnnouncements', 'getMakerByUid', 'getMyCoupons',
+    // ★★★ 追加: 取引ボード系は常に最新を取得 ★★★
+    'getDealBoardUnreadCount', 'getDealBoard', 'getDealBoardSince'
+  ];
   const skipCache = forceRefresh || NO_CACHE_ACTIONS.includes(action);
 
   if (!skipCache && apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
