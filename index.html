@@ -1,9 +1,29 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="notranslate" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>架空車街 | CPM架空車総合ポータル</title>
+
+  <!-- ★★★ 追加：OS自動判定（最速で実行） ★★★ -->
+  <script>
+    (function() {
+      var ua = navigator.userAgent;
+      var os = 'windows'; // デフォルト
+      if (/android/i.test(ua)) {
+        os = 'android';
+      } else if (/iphone|ipad|ipod/i.test(ua)) {
+        os = 'ios';
+      } else if (/macintosh|mac os x/i.test(ua)) {
+        os = 'ios'; // macOSはiOS風に
+      } else if (/windows/i.test(ua)) {
+        os = 'windows';
+      }
+      document.documentElement.setAttribute('data-os', os);
+    })();
+  </script>
+
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <!-- 基本のOGP設定 (Discordや多くのSNSで共通) -->
   <link rel="manifest" href="/manifest.json">
@@ -460,14 +480,21 @@ async function loadDealBoardList() {
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@MPEK_Group" />
   <style>
-    :root {
-      --main-color: #00d2ff;
-      --bg-color: #0a0c1b;
-      --card-bg: #16213e;
-      --accent-color: #e94560;
-      --text-color: #e0e0e0;
-    }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); }
+:root {
+  --main-color: #00d2ff;
+  --bg-color: #0a0c1b;
+  --card-bg: #16213e;
+  --accent-color: #e94560;
+  --text-color: #e0e0e0;
+  /* ★★★ 追加：OS別フォント変数 ★★★ */
+  --os-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+/* ★★★ 追加：OS別フォント切り替え（JSがdata-os属性を設定） ★★★ */
+html[data-os="windows"] { --os-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; }
+html[data-os="android"] { --os-font: 'Roboto', system-ui, sans-serif; }
+html[data-os="ios"]     { --os-font: -apple-system, 'SF Pro Text', 'Hiragino Sans', sans-serif; }
+
+body { margin: 0; font-family: var(--os-font); background: var(--bg-color); color: var(--text-color); }
     header { background: #0f3460; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--main-color); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
     header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
     
@@ -1024,7 +1051,7 @@ async function loadDealBoardList() {
       letter-spacing: 0.5px;
     }
     /* サポートメニュー（ドロップダウン）のスタイル */
-    .dropdown-menu {
+       .dropdown-menu {
       display: none;
       position: absolute;
       top: 100%;
@@ -1034,9 +1061,13 @@ async function loadDealBoardList() {
       border: 1px solid var(--main-color);
       border-radius: 4px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-      z-index: 100;
+      z-index: 99999;  /* ★ 100 → 99999 に変更（レイヤー下に隠れるのを防止） */
       min-width: 160px;
       overflow: hidden;
+    }
+    /* ★★★ 追加：親の.header-dropdownにもスタッキング文脈を明示 ★★★ */
+    .header-dropdown {
+      z-index: 99998;
     }
     .dropdown-menu.show {
       display: block;
@@ -1190,6 +1221,7 @@ input:checked + .slider:before {
 }
 
 /* 未読バッジ */
+/* 未読バッジ */
 #deal-board-badge {
   animation: dealBadgePulse 1.5s ease-in-out infinite;
 }
@@ -1197,6 +1229,467 @@ input:checked + .slider:before {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
 }
+
+/* ============================================================
+   ★★★ ここから追加：OS別テーマ（Windows 11 / Android / iOS） ★★★
+   ※ 元のレイアウト・サイズは維持し、見た目のみOS風に上書き
+   ============================================================ */
+
+/* ========== Windows 11 (Fluent Design) ========== */
+html[data-os="windows"] body { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; }
+
+html[data-os="windows"] header {
+  background: rgba(32,32,32,0.85) !important;
+  backdrop-filter: blur(30px) saturate(1.2);
+  -webkit-backdrop-filter: blur(30px) saturate(1.2);
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: none !important;
+}
+html[data-os="windows"] .tab-menu {
+  background: rgba(32,32,32,0.7) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+html[data-os="windows"] .tab-button { border-radius: 0; }
+html[data-os="windows"] .tab-button.active {
+  color: #60cdff; border-bottom: 2px solid #60cdff;
+  background: rgba(96,205,255,0.08);
+}
+html[data-os="windows"] .card {
+  background: rgba(255,255,255,0.0512) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html[data-os="windows"] .card:hover {
+  background: rgba(255,255,255,0.0837) !important;
+  border-color: #60cdff !important;
+  transform: translateY(-2px);
+}
+html[data-os="windows"] .btn {
+  border-radius: 4px !important;
+  background: #60cdff !important;
+  color: #000 !important;
+  border-bottom: 2px solid rgba(0,0,0,0.2);
+  font-weight: 600;
+}
+html[data-os="windows"] .btn:hover { background: #7ed8ff !important; }
+html[data-os="windows"] .btn:active { background: #4ab8e8 !important; border-bottom-width: 1px; transform: translateY(1px); }
+html[data-os="windows"] .btn-secondary {
+  background: rgba(255,255,255,0.0605) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+html[data-os="windows"] .btn-secondary:hover { background: rgba(255,255,255,0.0837) !important; }
+html[data-os="windows"] .btn-danger { background: #ff99a4 !important; color: #000 !important; }
+html[data-os="windows"] .modal-content {
+  background: rgba(32,32,32,0.95) !important;
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+html[data-os="windows"] .notif-box {
+  background: rgba(255,255,255,0.0512) !important;
+  border-left: 3px solid #60cdff !important;
+  border-radius: 4px !important;
+}
+html[data-os="windows"] .form-group input,
+html[data-os="windows"] .form-group textarea,
+html[data-os="windows"] .form-group select {
+  background: rgba(255,255,255,0.0605) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 4px !important;
+  border-bottom: 2px solid rgba(255,255,255,0.2) !important;
+}
+html[data-os="windows"] .form-group input:focus,
+html[data-os="windows"] .form-group textarea:focus,
+html[data-os="windows"] .form-group select:focus {
+  border-bottom-color: #60cdff !important;
+  outline: none;
+}
+html[data-os="windows"] .sub-item-box {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 4px !important;
+}
+html[data-os="windows"] .dropdown-menu {
+  background: rgba(32,32,32,0.95) !important;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+}
+html[data-os="windows"] .carousel-container { border-radius: 4px !important; }
+html[data-os="windows"] .rank-badge { border-radius: 4px !important; }
+html[data-os="windows"] .announcement {
+  background: rgba(96,205,255,0.1) !important;
+  color: #60cdff !important;
+  border: 1px solid rgba(96,205,255,0.3) !important;
+}
+html[data-os="windows"] body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(96,205,255,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(96,205,255,0.02) 0%, transparent 50%);
+  pointer-events: none; z-index: -1;
+}
+
+/* ========== Android (Material Design 3 - 薄水色系) ========== */
+html[data-os="android"] body { font-family: 'Roboto', system-ui, sans-serif; background: #111417; }
+
+html[data-os="android"] header {
+  background: #1A1C1E !important;
+  border-bottom: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+html[data-os="android"] .tab-menu {
+  background: #1A1C1E !important;
+  border-bottom: none !important;
+  gap: 4px; padding: 4px 8px;
+}
+html[data-os="android"] .tab-button {
+  border-radius: 20px !important;
+  padding: 10px 20px;
+  margin: 4px 2px;
+  border-bottom: none !important;
+  color: #BFC8CB;
+}
+html[data-os="android"] .tab-button.active {
+  background: #4FD8FF !important;
+  color: #003544 !important;
+  border-bottom: none !important;
+  font-weight: 600;
+}
+html[data-os="android"] .card {
+  background: #1A1C1E !important;
+  border: 1px solid #3F484B !important;
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+}
+html[data-os="android"] .card:hover {
+  border-color: #4FD8FF !important;
+  box-shadow: 0 4px 12px rgba(79,216,255,0.18) !important;
+  transform: translateY(-2px);
+}
+html[data-os="android"] .card-img { border-radius: 16px 16px 0 0; }
+html[data-os="android"] .btn {
+  border-radius: 20px !important;
+  background: #4FD8FF !important;
+  color: #003544 !important;
+  font-weight: 600;
+  padding: 10px 24px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+html[data-os="android"] .btn:hover {
+  background: #7FE4FF !important;
+  box-shadow: 0 2px 8px rgba(79,216,255,0.35);
+}
+html[data-os="android"] .btn:active { background: #38C5EE !important; box-shadow: none; }
+html[data-os="android"] .btn-secondary {
+  background: #3F484B !important;
+  color: #E1E3E5 !important;
+}
+html[data-os="android"] .btn-secondary:hover { background: #4F585B !important; }
+html[data-os="android"] .btn-danger { background: #FFB4AB !important; color: #690005 !important; }
+html[data-os="android"] .modal-content {
+  background: #1A1C1E !important;
+  border: 1px solid #3F484B !important;
+  border-radius: 28px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+  padding: 28px;
+}
+html[data-os="android"] .notif-box {
+  background: #222528 !important;
+  border-left: none !important;
+  border-radius: 12px !important;
+  border: 1px solid #3F484B !important;
+}
+html[data-os="android"] .form-group input,
+html[data-os="android"] .form-group textarea,
+html[data-os="android"] .form-group select {
+  background: #222528 !important;
+  border: 1px solid #3F484B !important;
+  border-radius: 12px !important;
+  padding: 12px 16px;
+  color: #E1E3E5;
+}
+html[data-os="android"] .form-group input:focus,
+html[data-os="android"] .form-group textarea:focus,
+html[data-os="android"] .form-group select:focus {
+  border-color: #4FD8FF !important;
+  outline: none;
+  box-shadow: 0 0 0 1px #4FD8FF;
+}
+html[data-os="android"] .sub-item-box {
+  background: #222528 !important;
+  border: 1px solid #3F484B !important;
+  border-radius: 12px !important;
+}
+html[data-os="android"] .dropdown-menu {
+  background: #222528 !important;
+  border: 1px solid #3F484B !important;
+  border-radius: 16px !important;
+}
+html[data-os="android"] .dropdown-menu button { border-radius: 12px; margin: 2px 4px; color: #E1E3E5; }
+html[data-os="android"] .dropdown-menu button:hover { background: rgba(79,216,255,0.12); color: #4FD8FF; }
+html[data-os="android"] .carousel-container { border-radius: 16px !important; }
+html[data-os="android"] .rank-badge { border-radius: 20px !important; }
+html[data-os="android"] .announcement {
+  border-radius: 20px !important;
+  background: rgba(79,216,255,0.12) !important;
+  color: #4FD8FF !important;
+  border: none !important;
+}
+html[data-os="android"] .card-badge {
+  background: #FFB4AB !important; color: #690005 !important;
+  border-radius: 8px !important;
+}
+html[data-os="android"] body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse at 10% 90%, rgba(79,216,255,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 10%, rgba(79,216,255,0.05) 0%, transparent 50%);
+  pointer-events: none; z-index: -1;
+}
+
+/* ========== iOS (Liquid Glass - ぼかし強化) ========== */
+html[data-os="ios"] body {
+  font-family: -apple-system, 'SF Pro Text', 'Hiragino Sans', sans-serif;
+  background: #000;
+  position: relative;
+}
+html[data-os="ios"] body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(10,132,255,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(255,69,58,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%);
+  pointer-events: none; z-index: -1;
+}
+html[data-os="ios"] header {
+  background: rgba(28,28,30,0.55) !important;
+  backdrop-filter: blur(50px) saturate(2);
+  -webkit-backdrop-filter: blur(50px) saturate(2);
+  border-bottom: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset !important;
+}
+html[data-os="ios"] .tab-menu {
+  background: rgba(28,28,30,0.5) !important;
+  backdrop-filter: blur(40px) saturate(1.9);
+  -webkit-backdrop-filter: blur(40px) saturate(1.9);
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  gap: 4px; padding: 4px;
+}
+html[data-os="ios"] .tab-button {
+  border-radius: 12px !important;
+  border-bottom: none !important;
+  padding: 8px 16px;
+  margin: 2px;
+}
+html[data-os="ios"] .tab-button.active {
+  background: rgba(10,132,255,0.22) !important;
+  color: #4DA6FF !important;
+  border-bottom: none !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 1px 4px rgba(10,132,255,0.15);
+}
+html[data-os="ios"] .card {
+  background: rgba(255,255,255,0.07) !important;
+  backdrop-filter: blur(24px) saturate(1.7);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7);
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  border-radius: 22px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 8px 32px rgba(0,0,0,0.35) !important;
+  position: relative;
+}
+html[data-os="ios"] .card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  pointer-events: none;
+  border-radius: 22px 22px 0 0;
+}
+html[data-os="ios"] .card:hover {
+  background: rgba(255,255,255,0.12) !important;
+  border-color: rgba(10,132,255,0.45) !important;
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.28),
+    0 12px 48px rgba(0,0,0,0.45) !important;
+}
+html[data-os="ios"] .card-img { border-radius: 22px 22px 0 0; }
+html[data-os="ios"] .btn {
+  border-radius: 20px !important;
+  background: rgba(10,132,255,0.88) !important;
+  color: #fff !important;
+  font-weight: 600;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    inset 0 -1px 0 rgba(0,0,0,0.15),
+    0 2px 12px rgba(10,132,255,0.35);
+}
+html[data-os="ios"] .btn:hover {
+  background: rgba(10,132,255,1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    0 4px 20px rgba(10,132,255,0.5);
+}
+html[data-os="ios"] .btn:active { transform: scale(0.97); }
+html[data-os="ios"] .btn-secondary {
+  background: rgba(255,255,255,0.14) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 2px 8px rgba(0,0,0,0.2);
+}
+html[data-os="ios"] .btn-secondary:hover { background: rgba(255,255,255,0.22) !important; }
+html[data-os="ios"] .btn-danger {
+  background: rgba(255,69,58,0.88) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,0.22) !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    0 2px 12px rgba(255,69,58,0.4);
+}
+html[data-os="ios"] .modal {
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+html[data-os="ios"] .modal-content {
+  background: rgba(28,28,30,0.72) !important;
+  backdrop-filter: blur(60px) saturate(2);
+  -webkit-backdrop-filter: blur(60px) saturate(2);
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  border-radius: 30px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 -1px 0 rgba(0,0,0,0.2),
+    0 12px 48px rgba(0,0,0,0.65) !important;
+  position: relative;
+}
+html[data-os="ios"] .modal-content::before {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  pointer-events: none;
+}
+html[data-os="ios"] .notif-box {
+  background: rgba(255,255,255,0.08) !important;
+  backdrop-filter: blur(24px) saturate(1.7);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7);
+  border-left: none !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 4px 20px rgba(0,0,0,0.3);
+}
+html[data-os="ios"] .form-group input,
+html[data-os="ios"] .form-group textarea,
+html[data-os="ios"] .form-group select {
+  background: rgba(255,255,255,0.08) !important;
+  backdrop-filter: blur(20px) saturate(1.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  border-radius: 14px !important;
+  padding: 12px 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+html[data-os="ios"] .form-group input:focus,
+html[data-os="ios"] .form-group textarea:focus,
+html[data-os="ios"] .form-group select:focus {
+  border-color: rgba(10,132,255,0.65) !important;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 0 0 3px rgba(10,132,255,0.28);
+  background: rgba(255,255,255,0.11) !important;
+}
+html[data-os="ios"] .sub-item-box {
+  background: rgba(255,255,255,0.05) !important;
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 16px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+}
+html[data-os="ios"] .dropdown-menu {
+  background: rgba(28,28,30,0.72) !important;
+  backdrop-filter: blur(50px) saturate(2);
+  -webkit-backdrop-filter: blur(50px) saturate(2);
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 12px 40px rgba(0,0,0,0.5);
+}
+html[data-os="ios"] .dropdown-menu button { color: #fff; }
+html[data-os="ios"] .dropdown-menu button:hover { background: rgba(10,132,255,0.2); }
+html[data-os="ios"] .carousel-container {
+  border-radius: 22px !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 8px 32px rgba(0,0,0,0.4);
+}
+html[data-os="ios"] .carousel-btn {
+  background: rgba(28,28,30,0.6) !important;
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+html[data-os="ios"] .rank-badge {
+  border-radius: 20px !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    0 2px 8px rgba(0,0,0,0.3);
+}
+html[data-os="ios"] .rank-1 { box-shadow: 0 0 20px #ffd700, inset 0 1px 0 rgba(255,255,255,0.5); }
+html[data-os="ios"] .card-badge {
+  background: rgba(255,69,58,0.75) !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+}
+html[data-os="ios"] .announcement {
+  border-radius: 20px !important;
+  background: rgba(255,255,255,0.1) !important;
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  color: #4DA6FF !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
   </style>
 </head>
 <body>
