@@ -1804,6 +1804,114 @@ html[data-os="ios"] .announcement {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
+/* ============================================================
+   ★★★ デザイン設定モーダル ★★★
+   ============================================================ */
+.design-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  position: relative;
+}
+.design-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(0, 210, 255, 0.4);
+}
+.design-option:active {
+  transform: scale(0.98);
+}
+.design-option.selected {
+  background: rgba(0, 210, 255, 0.12);
+  border-color: var(--main-color);
+}
+.design-option-icon {
+  font-size: 1.6rem;
+  flex: 0 0 auto;
+  width: 40px;
+  text-align: center;
+  line-height: 1;
+}
+.design-option-info {
+  flex: 1;
+  min-width: 0;
+}
+.design-option-title {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.design-option-desc {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+.design-option-check {
+  font-size: 1.3rem;
+  color: var(--main-color);
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex: 0 0 auto;
+}
+.design-option.selected .design-option-check {
+  opacity: 1;
+}
+
+/* --- Windows 11 (Mica) 用の見た目 --- */
+html[data-os="windows"] .design-option {
+  border-radius: 4px !important;
+}
+html[data-os="windows"] .design-option.selected {
+  background: rgba(96, 205, 255, 0.15) !important;
+  border-color: #60cdff !important;
+}
+html[data-os="windows"] .design-option:hover {
+  border-color: #60cdff !important;
+}
+html[data-os="windows"] .design-option-check {
+  color: #60cdff !important;
+}
+
+/* --- Android (Capsule) 用の見た目 --- */
+html[data-os="android"] .design-option {
+  border-radius: 16px !important;
+}
+html[data-os="android"] .design-option.selected {
+  background: rgba(79, 216, 255, 0.18) !important;
+  border-color: #4FD8FF !important;
+}
+html[data-os="android"] .design-option:hover {
+  border-color: #4FD8FF !important;
+}
+html[data-os="android"] .design-option-check {
+  color: #4FD8FF !important;
+}
+
+/* --- iOS (Cupertino) 用の見た目 --- */
+html[data-os="ios"] .design-option {
+  border-radius: 16px !important;
+  backdrop-filter: blur(20px) saturate(1.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html[data-os="ios"] .design-option.selected {
+  background: rgba(10, 132, 255, 0.18) !important;
+  border-color: rgba(10, 132, 255, 0.6) !important;
+}
+html[data-os="ios"] .design-option:hover {
+  border-color: rgba(10, 132, 255, 0.5) !important;
+}
+html[data-os="ios"] .design-option-check {
+  color: #0A84FF !important;
+}
+
   </style>
 </head>
 <body>
@@ -1855,9 +1963,10 @@ html[data-os="ios"] .announcement {
     <!-- ★ ここから：まとめボタン（ドロップダウン） -->
     <div class="header-dropdown" style="display: inline-block; position: relative; margin-right: 5px;">
       <button class="btn btn-secondary" onclick="toggleSupportMenu(event)"> ⋮ </button>
-      <div id="support-menu" class="dropdown-menu">
+            <div id="support-menu" class="dropdown-menu">
         <button onclick="openContact(); closeSupportMenu();">お問い合わせ</button>
         <button onclick="window.open('https://cpmcarshop.github.io/bbs.html', '_blank'); closeSupportMenu();">掲示板</button>
+        <button onclick="openDesignSettings();">デザイン設定</button>
       </div>
     </div>
     <!-- ★ ここまで -->
@@ -2154,6 +2263,60 @@ html[data-os="ios"] .announcement {
       <button class="btn btn-secondary" onclick="closeModal('edit-coupon-modal')">キャンセル</button>
     </div>
   </div>
+
+  <!-- ★★★ 追加: デザイン設定モーダル ★★★ -->
+  <div id="design-settings-modal" class="modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <h3>🎨 デザイン設定</h3>
+      <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 20px;">
+        お好みのOS風デザインを選択できます。変更は即座に反映され、次回訪問時も維持されます。
+      </p>
+
+      <div class="design-option" data-theme="auto" onclick="applyDesignTheme('auto')">
+        <div class="design-option-icon">🔄</div>
+        <div class="design-option-info">
+          <div class="design-option-title">自動</div>
+          <div class="design-option-desc">お使いの端末に合わせて自動選択</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div class="design-option" data-theme="windows" onclick="applyDesignTheme('windows')">
+        <div class="design-option-icon">🪟</div>
+        <div class="design-option-info">
+          <div class="design-option-title">Mica</div>
+          <div class="design-option-desc">Fluent Design</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div class="design-option" data-theme="android" onclick="applyDesignTheme('android')">
+        <div class="design-option-icon">🤖</div>
+        <div class="design-option-info">
+          <div class="design-option-title">Capsule</div>
+          <div class="design-option-desc">Material Design 3</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div class="design-option" data-theme="ios" onclick="applyDesignTheme('ios')">
+        <div class="design-option-icon">🍎</div>
+        <div class="design-option-info">
+          <div class="design-option-title">Cupertino</div>
+          <div class="design-option-desc">Liquid Glass</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div style="text-align: right; margin-top: 20px;">
+        <button class="btn btn-secondary" onclick="closeModal('design-settings-modal')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★★★ 追加: セール編集モーダル ★★★ -->
+
+<!-- Firebase モジュール SDK (v10) -->
 
   <!-- ★★★ 追加: セール編集モーダル ★★★ -->
 
@@ -5154,22 +5317,87 @@ img4Base64: await getImageBase64(document.getElementById('c-img4')),
       }
     }
 
-// サポートメニューの開閉処理
-    function toggleSupportMenu(event) {
-      event.stopPropagation();
-      const menu = document.getElementById('support-menu');
-      menu.classList.toggle('show');
-    }
+/* ============================================================
+   ドロップダウンメニュー
+   ============================================================ */
+function toggleSupportMenu(event) {
+  event.stopPropagation();
+  document.getElementById('support-menu').classList.toggle('show');
+}
 
-    function closeSupportMenu() {
-      const menu = document.getElementById('support-menu');
-      if (menu) menu.classList.remove('show');
-    }
+function closeSupportMenu() {
+  const menu = document.getElementById('support-menu');
+  if (menu) menu.classList.remove('show');
+}
 
-    // メニュー外をクリックしたら閉じる
-    window.addEventListener('click', function() {
-      closeSupportMenu();
-    });
+window.addEventListener('click', function() {
+  closeSupportMenu();
+});
+
+/* ============================================================
+   ★★★ デザイン設定 ★★★
+   ============================================================ */
+const THEME_STORAGE_KEY = 'theme-preference';
+
+// 現在のOSを検出（自動モード時に使用）
+function detectOSTheme() {
+  var ua = navigator.userAgent;
+  if (/android/i.test(ua)) return 'android';
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+  if (/macintosh|mac os x/i.test(ua)) return 'ios';
+  if (/windows/i.test(ua)) return 'windows';
+  return 'windows'; // 不明な端末はWindows風
+}
+
+// 保存された設定を取得（'auto' | 'windows' | 'android' | 'ios'）
+function getSavedTheme() {
+  try {
+    var saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'windows' || saved === 'android' || saved === 'ios' || saved === 'auto') {
+      return saved;
+    }
+  } catch (e) {}
+  return 'auto'; // 初回は自動
+}
+
+// テーマを適用（即時切替 + 保存）
+function applyDesignTheme(theme) {
+  // theme: 'auto' | 'windows' | 'android' | 'ios'
+  var os;
+  if (theme === 'auto') {
+    os = detectOSTheme();
+  } else {
+    os = theme;
+  }
+
+  // 即時反映
+  document.documentElement.setAttribute('data-os', os);
+
+  // 保存（'auto' も保存するので、次回訪問時に「自動」の選択状態を再現できる）
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch (e) {
+    console.warn('テーマ設定の保存に失敗しました', e);
+  }
+
+  // モーダル内の選択状態を更新
+  updateDesignSelection(theme);
+}
+
+// モーダル内の選択ハイライトを更新
+function updateDesignSelection(theme) {
+  document.querySelectorAll('.design-option').forEach(function(el) {
+    el.classList.toggle('selected', el.dataset.theme === theme);
+  });
+}
+
+// デザイン設定モーダルを開く
+function openDesignSettings() {
+  closeSupportMenu(); // ⋮メニューを閉じる
+  updateDesignSelection(getSavedTheme()); // 現在の設定を反映
+  document.getElementById('design-settings-modal').style.display = 'flex';
+}
+
 
     // ============================================================
 // パスワードリセット機能
