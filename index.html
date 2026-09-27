@@ -1852,10 +1852,8 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
   const cacheKey = action + JSON.stringify(payload);
   const now = Date.now();
 
-  // ★ キャッシュを無視すべきアクション or forceRefresh が true ならキャッシュをスキップ
   const NO_CACHE_ACTIONS = [
     'registerUser', 'getUserAnnouncements', 'getMakerByUid', 'getMyCoupons',
-    // ★★★ 追加: 取引ボード系は常に最新を取得 ★★★
     'getDealBoardUnreadCount', 'getDealBoard', 'getDealBoardSince'
   ];
   const skipCache = forceRefresh || NO_CACHE_ACTIONS.includes(action);
@@ -1865,7 +1863,6 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     return apiCache[cacheKey].data;
   }
 
-  // ★ 同じ action の前回通信だけをキャンセル（他は潰さない）
   if (currentAbortControllers[action]) {
     currentAbortControllers[action].abort();
   }
@@ -1873,18 +1870,13 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
   currentAbortControllers[action] = controller;
   const signal = controller.signal;
 
-  // ★ showLoadingFlag が true の場合のみローディング表示
   if (showLoadingFlag) {
     showLoading("サーバーと通信中...");
   }
 
-  // ★★★ 追加: リトライ設定（書き込み系・取引ボード系はリトライする） ★★★
-  const RETRYABLE_ACTIONS = [
-    'saveDealContent', 'getDealBoard', 'getDealBoardSince',
-    'markDealBoardRead', 'getDealBoardUnreadCount'
-  ];
-  const MAX_RETRY = RETRYABLE_ACTIONS.includes(action) ? 2 : 0;
-  const RETRY_DELAY = 800;
+  // ★ 全アクションで最大3回リトライ
+  const MAX_RETRY = 3;
+  const BASE_DELAY = 800;
 
   try {
     for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
@@ -1896,15 +1888,28 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
           signal
         });
 
-        // ★★★ 追加: HTTPステータスチェック ★★★
         if (!res.ok) {
           throw new Error('HTTPエラー: ' + res.status + ' ' + res.statusText);
         }
 
-        // ★★★ 追加: レスポンスがJSONかどうかを先にテキストで確認 ★★★
         const text = await res.text();
+
+        // ★ 非JSONレスポンスを分類
         if (!text.trim().startsWith('{')) {
-          console.error('⚠️ 非JSONレスポンス (' + action + '):', text.substring(0, 200));
+          const isRetryable =
+            text.includes('同時に実行中のスクリプト') ||
+            text.includes('too many simultaneous') ||
+            text.includes('Service invoked too many times') ||
+            text.includes('Google Docs encountered an error') ||
+            text.includes('一時的なエラー') ||
+            text.includes('<html');
+
+          if (isRetryable && attempt < MAX_RETRY) {
+            const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 1000;
+            console.warn(`⚠️ GAS混雑エラー (試行${attempt + 1}/${MAX_RETRY + 1}): ${Math.round(delay)}ms 待機`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
           throw new Error('サーバーが混雑しています。数秒後にもう一度お試しください。');
         }
 
@@ -1912,14 +1917,17 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
         try {
           result = JSON.parse(text);
         } catch (jsonErr) {
-          console.error('⚠️ JSON解析失敗 (' + action + '):', text.substring(0, 200));
+          if (attempt < MAX_RETRY) {
+            const delay = BASE_DELAY * Math.pow(2, attempt);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
           throw new Error('サーバー応答の解析に失敗しました。');
         }
 
-        // callGasApi 内の BAN 検知部分を修正
+        // BAN検知
         if (result && result.banned) {
           for (let key in apiCache) { delete apiCache[key]; }
-          // GAS_URL は先頭で定義済み（例: const GAS_URL = "https://script.google.com/.../exec";）
           let url = GAS_URL + '?page=goodbye';
           if (result.remaining) {
             url += '&days=' + encodeURIComponent(result.remaining);
@@ -1927,7 +1935,17 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
           window.location.href = url;
           return null;
         }
-        if (!result.success) throw new Error(result.error || 'API呼び出しに失敗しました');
+
+        // ★ retryable フラグを尊重
+        if (!result.success) {
+          if (result.retryable && attempt < MAX_RETRY) {
+            const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 1000;
+            console.warn(`⚠️ サーバー混雑 (試行${attempt + 1}/${MAX_RETRY + 1}): ${Math.round(delay)}ms 待機`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          throw new Error(result.error || 'API呼び出しに失敗しました');
+        }
 
         apiCache[cacheKey] = {
           data: result.data,
@@ -1935,33 +1953,29 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
         };
         return result.data;
 
-      // callGasApi 関数内の catch ブロックを以下のように修正
       } catch (e) {
         if (e.name === 'AbortError') {
           console.log('リクエストキャンセル: ' + action);
           return null;
         }
 
-        // ★★★ 追加: リトライ可能なら待機して再試行 ★★★
         if (attempt < MAX_RETRY) {
-          console.warn(`⚠️ ${action} 失敗 (試行${attempt + 1}/${MAX_RETRY + 1}): ${e.message} → リトライ`);
-          await new Promise(r => setTimeout(r, RETRY_DELAY * (attempt + 1)));
+          const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 1000;
+          console.warn(`⚠️ ${action} 失敗 (試行${attempt + 1}/${MAX_RETRY + 1}): ${e.message} → ${Math.round(delay)}ms 後にリトライ`);
+          await new Promise(r => setTimeout(r, delay));
           continue;
         }
 
         console.error('APIエラー (' + action + '):', e.message);
-        // ★★★ この1行を追加（エラーメッセージを保存） ★★★
         window._lastApiError = e.message;
         return null;
       }
     }
     return null;
   } finally {
-    // ★ ローディング表示していた場合のみ非表示
     if (showLoadingFlag) {
       hideLoading();
     }
-    // ★ 自分自身のコントローラをクリア
     if (currentAbortControllers[action] === controller) {
       delete currentAbortControllers[action];
     }
