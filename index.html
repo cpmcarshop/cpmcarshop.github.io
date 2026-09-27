@@ -495,11 +495,23 @@ html[data-os="android"] { --os-font: 'Roboto', system-ui, sans-serif; }
 html[data-os="ios"]     { --os-font: -apple-system, 'SF Pro Text', 'Hiragino Sans', sans-serif; }
 
 body { margin: 0; font-family: var(--os-font); background: var(--bg-color); color: var(--text-color); }
-    header { background: #0f3460; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--main-color); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
-    header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
-    
-    /* タブメニュー UI */
-    .tab-menu { display: flex; background: #16213e; justify-content: center; gap: 10px; border-bottom: 1px solid #333; overflow-x: auto; }
+    header {
+  background: #0f3460; padding: 15px 25px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 2px solid var(--main-color);
+  box-shadow: 0 0 15px rgba(0,210,255,0.3);
+  position: relative;   /* ★ 追加：スタッキング文脈を作る */
+  z-index: 10;          /* ★ 追加：tab-menuより前面に */
+}
+header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
+
+/* タブメニュー UI */
+.tab-menu {
+  display: flex; background: #16213e; justify-content: center; gap: 10px;
+  border-bottom: 1px solid #333; overflow-x: auto;
+  position: relative;   /* ★ 追加 */
+  z-index: 1;           /* ★ 追加：header(10)より下に */
+}
     .tab-button { background: none; border: none; color: #aaa; font-size: 1rem; padding: 12px 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
     .tab-button.active { color: var(--main-color); border-bottom: 3px solid var(--main-color); background: rgba(0,210,255,0.05); }
     
@@ -874,34 +886,67 @@ body { margin: 0; font-family: var(--os-font); background: var(--bg-color); colo
   display: none;
   background: none;
   border: none;
-  color: #fff;
-  font-size: 1.8rem;
-  padding: 8px 12px;
+  padding: 0;
   cursor: pointer;
-  margin-left: 0;          /* ★ auto から 0 に変更（左寄せ） */
+  margin-left: 0;
+  width: 44px;                     /* ★ 追加：固定サイズ */
+  height: 44px;                    /* ★ 追加 */
+  position: relative;              /* ★ 追加：spanの基準 */
+  flex: 0 0 auto;
+}
+.hamburger span {                  /* ★ 追加：3本線 */
+  display: block;
+  position: absolute;
+  left: 10px;
+  width: 24px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+  transition: top 0.3s ease, transform 0.3s ease, opacity 0.2s ease;
+}
+.hamburger span:nth-child(1) { top: 14px; }
+.hamburger span:nth-child(2) { top: 21px; }
+.hamburger span:nth-child(3) { top: 28px; }
+
+/* ★ 追加：開いたとき「☰」→「✕」に変形 */
+.tab-menu.open .hamburger span:nth-child(1) {
+  top: 21px;
+  transform: rotate(45deg);
+}
+.tab-menu.open .hamburger span:nth-child(2) {
+  opacity: 0;
+}
+.tab-menu.open .hamburger span:nth-child(3) {
+  top: 21px;
+  transform: rotate(-45deg);
 }
 
 /* スマホ表示（768px以下） */
 @media (max-width: 768px) {
-  /* ★ タブメニュー全体を左寄せに */
   .tab-menu {
     flex-direction: row !important;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-start !important;  /* ★ 左寄せを明示 */
+    justify-content: flex-start !important;
+    overflow: hidden;                                   /* ★ 追加 */
+    max-height: 60px;                                   /* ★ 追加：閉じた状態（ハンバーガー分のみ） */
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);  /* ★ 追加 */
   }
-
-  /* ★ ハンバーガーボタンを左端に固定 */
+  .tab-menu.open {
+    max-height: 600px;                                  /* ★ 追加：開いた状態 */
+  }
   .tab-menu .hamburger {
-    display: block;          /* 表示 */
-    width: auto;
+    display: block;
+    width: 44px;                                        /* ★ 修正：固定幅 */
+    height: 44px;                                       /* ★ 修正 */
     flex: 0 0 auto;
     border-bottom: none;
-    margin-left: 0;          /* ★ 確実に左端 */
-    order: -1;               /* ★ 他の要素より前に配置（念のため） */
+    margin-left: 0;
+    order: -1;
   }
   .tab-menu .tab-button {
-    display: none;             /* デフォルト非表示 */
+    display: block;                                     /* ★ 修正：常にblock */
+    flex-basis: 100%;                                   /* ★ 追加 */
     width: 100%;
     text-align: left;
     padding: 12px 16px;
@@ -909,36 +954,15 @@ body { margin: 0; font-family: var(--os-font); background: var(--bg-color); colo
     background: #16213e;
     font-size: 1rem;
   }
-  .tab-menu.open .tab-button {
-    display: block;            /* ハンバーガー押下で表示 */
-  }
+  /* ★ 旧「.tab-menu.open .tab-button { display: block; }」は削除 */
 
   /* ヘッダー調整 */
-  header {
-    flex-wrap: wrap;
-    padding: 10px 15px;
-  }
-  header h1 {
-    font-size: 1.2rem;
-  }
-  header div {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-  }
-  #user-display-name {
-    font-size: 0.8rem;
-  }
-  .btn {
-    padding: 6px 12px;
-    font-size: 0.85rem;
-  }
-
-  /* カードグリッドを1列に */
-  .card-grid {
-    grid-template-columns: 1fr;
-  }
+  header { flex-wrap: wrap; padding: 10px 15px; }
+  header h1 { font-size: 1.2rem; }
+  header div { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  #user-display-name { font-size: 0.8rem; }
+  .btn { padding: 6px 12px; font-size: 0.85rem; }
+  .card-grid { grid-template-columns: 1fr; }
 }
     /* デフォルトは非表示（ログイン時のみ表示） */
 /* デフォルトでは非表示（ログイン時のみ表示） */
@@ -951,22 +975,8 @@ body { margin: 0; font-family: var(--os-font); background: var(--bg-color); colo
 }
 
 /* スマホ表示（768px以下） */
-@media (max-width: 768px) {
-  .tab-menu .tab-button {
-    display: none;
-  }
-  .tab-menu.open .tab-button {
-    display: block;
-  }
-
-  /* ★ スマホでは常に非表示（ハンバーガー開いたときだけ表示） */
-  #mypage-tab.is-visible {
-    display: none;
-  }
-  .tab-menu.open #mypage-tab.is-visible {
-    display: block;
-  }
-}
+/* ★ max-height で開閉制御するため、display 切り替えは全て削除。
+   #mypage-tab.is-visible の基本ルール（display: block）がそのまま適用される。 */
 /* ===== アナウンス（共通） ===== */
 .announcement {
   font-size: 1rem;              /* PCでは大きめ */
@@ -1003,30 +1013,29 @@ body { margin: 0; font-family: var(--os-font); background: var(--bg-color); colo
 /* ===== スマホ表示（768px以下） ===== */
 /* ===== スマホ表示（768px以下） ===== */
 @media (max-width: 768px) {
-  /* PC用アナウンスを非表示、スマホ用アナウンスを表示 */
-  #announcement-pc {
-    display: none !important;
-  }
+  #announcement-pc { display: none !important; }
   #announcement-mobile {
     display: inline-block !important;
     flex: 0 0 auto;
-    margin: 4px 0 4px 8px;    /* ★ 上下4px、左8pxの外側余白（バーと離す） */
+    margin: 4px 0 4px 8px;
     max-width: 250px;
     font-size: 0.85rem;
     padding: 2px 10px;
   }
-  /* ハンバーガーメニューとアナウンスを横並びにする */
   .tab-menu {
     flex-direction: row !important;
     flex-wrap: wrap;
     align-items: center;
-    padding: 8px 10px;         /* ★ 上下左右の内側余白（上下8px） */
+    padding: 8px 10px;
+    /* ★ max-height は 3-1 で設定済み */
   }
   .tab-menu .hamburger {
-    width: auto;
+    width: 44px;                                  /* ★ 修正：3-1と合わせる */
+    height: 44px;                                 /* ★ 修正 */
     flex: 0 0 auto;
     border-bottom: none;
-    margin: 4px 0;             /* ★ 上下に4pxの外側余白（バーと離す） */
+    margin: 4px 0;
+    padding: 0;
   }
   .tab-menu .tab-button {
     order: 10;
@@ -1756,7 +1765,11 @@ html[data-os="ios"] .announcement {
 </header>
 
   <nav class="tab-menu" id="tabMenu">
-  <button class="hamburger" id="hamburgerBtn" aria-label="メニュー">☰</button>
+  <button class="hamburger" id="hamburgerBtn" aria-label="メニュー">
+  <span></span>
+  <span></span>
+  <span></span>
+</button>
   <!-- ★ スマホ用アナウンス（ハンバーガーボタンの右隣） -->
   <div id="announcement-mobile" class="announcement"></div>
   
@@ -5191,6 +5204,13 @@ loadAnnouncement(); // ★ 追加
     const currentScrollY = window.scrollY;
     const delta = currentScrollY - lastScrollY;
 
+    // ★★★ 追加：ページ最上部に到達したら必ず表示 ★★★
+    if (currentScrollY <= 10) {
+      wrapper.classList.remove('hidden');
+      lastScrollY = currentScrollY;
+      return;
+    }
+
     // 閾値を超えた場合のみ方向を判定
     if (delta > SCROLL_THRESHOLD) {
       // 下にスクロール → ヘッダーを隠す
@@ -5199,12 +5219,9 @@ loadAnnouncement(); // ★ 追加
       // 上にスクロール → ヘッダーを表示
       wrapper.classList.remove('hidden');
     }
-    // 閾値未満の微細な動きは無視
 
-    // 常に最新のスクロール位置を更新（閾値内でも更新しないとズレる）
     lastScrollY = currentScrollY;
   }
-
   // スクロールイベント（requestAnimationFrameで最適化）
   window.addEventListener('scroll', function() {
     if (!ticking) {
