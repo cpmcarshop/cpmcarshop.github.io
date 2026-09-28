@@ -3402,26 +3402,28 @@ async function showMyOrders() {
     `;
   }).join('');
 }
-    // ★ 車両データにメーカーアイコンを追加する関数
+// ★ メーカーアイコンのメモリキャッシュ（新規追加）
+let _makerIconMapCache = null;
+
+// ★ 車両データにメーカーアイコンを追加する関数
 async function enrichCarsWithMakerIcons(cars) {
-   if (!cars || !Array.isArray(cars) || cars.length === 0) return [];
+  if (!cars || !Array.isArray(cars) || cars.length === 0) return [];
 
-  // メーカー一覧を取得（キャッシュが効くので高速）
-  const makers = await callGasApi('getMakers', {}, true);
-  if (!makers) return cars;
+  // ★ キャッシュがなければ取得、あればそれを使う
+  if (!_makerIconMapCache) {
+    const makers = await callGasApi('getMakers', {}, true);
+    if (!makers) return cars;
+    _makerIconMapCache = {};
+    makers.forEach(m => {
+      if (m.makerId && m.iconUrl) {
+        _makerIconMapCache[m.makerId] = m.iconUrl;
+      }
+    });
+  }
 
-  // メーカーID → iconUrl のマップを作成
-  const makerIconMap = {};
-  makers.forEach(m => {
-    if (m.makerId && m.iconUrl) {
-      makerIconMap[m.makerId] = m.iconUrl;
-    }
-  });
-
-  // 各車両に makerIcon を追加
   return cars.map(c => ({
     ...c,
-    makerIcon: makerIconMap[c.makerId] || null
+    makerIcon: _makerIconMapCache[c.makerId] || null
   }));
 }
     
@@ -4910,16 +4912,13 @@ function updateUserTwitterId(uid, twitterId) {
     }
 
     // --- マイページ・店舗管理 ---
-   // --- マイページ・店舗管理 ---
-// --- マイページ・店舗管理 ---
-// --- マイページ・店舗管理 ---
-// --- マイページ・店舗管理 ---
 async function loadMypageData() {
   if (!window.currentUser) return;
-  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
-  // loadMypageData 内の maker 取得直後
-window._currentMaker = maker;
-  
+
+  // ★ フルスクリーンローディングを出さない（false）、キャッシュは使う
+  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid }, false);
+  window._currentMaker = maker;
+
   const statusArea = document.getElementById('maker-status-area');
   if (!maker) {
     statusArea.innerHTML = `<p>メーカー情報が未登録です。</p><button class="btn" onclick="openMakerModal()">架空車メーカーを登録する</button>`;
@@ -4928,14 +4927,12 @@ window._currentMaker = maker;
     return;
   }
 
-  // ★ 自社車両一覧を先に取得（セレクトボックス用）
-const result = await callGasApi('getCars', { makerId: maker.makerId });
-const myCars = (result && result.cars) ? result.cars : [];  // ★ 安全に
-const enrichedCars = await enrichCarsWithMakerIcons(myCars);
+  // ★ 自社車両一覧を取得（showLoading=false）
+  const result = await callGasApi('getCars', { makerId: maker.makerId }, false);
+  const myCars = (result && result.cars) ? result.cars : [];
+  const enrichedCars = await enrichCarsWithMakerIcons(myCars);
 
-
-  // statusArea.innerHTML 内にCPM IDを追加
-statusArea.innerHTML = `
+  statusArea.innerHTML = `
   <div class="card" style="display:flex; gap:15px; padding:15px; align-items:center;">
     <img src="${addRwParam(maker.iconUrl) || 'https://placehold.co/80?text=Icon'}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
     <div>
@@ -5003,13 +5000,15 @@ statusArea.innerHTML = `
   `;
 
   statusArea.parentNode.insertBefore(adminContainer, statusArea.nextSibling);
-const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid });
-const orderList = document.getElementById('orders-notification-list');
-if (orderRes && orderRes.orders.length > 0) {
-  orderList.innerHTML = orderRes.orders.map(o => {
-  const optionsArray = Array.isArray(o.options) ? o.options : [];
-  const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
-  return `
+
+  // ★ showLoading=false に変更
+  const orderRes = await callGasApi('getMakerOrders', { uid: window.currentUser.uid }, false);
+  const orderList = document.getElementById('orders-notification-list');
+  if (orderRes && orderRes.orders.length > 0) {
+    orderList.innerHTML = orderRes.orders.map(o => {
+      const optionsArray = Array.isArray(o.options) ? o.options : [];
+      const optionsDisplay = optionsArray.length ? optionsArray.join(', ') : 'なし';
+      return `
     <div class="notif-box">
       <strong>【注文】${o.buyerName} 様</strong>（@${o.buyerTwitterId || '未設定'}） - ${o.createdAt}<br>
       🚗 車種: ${o.carName || '不明'} | グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
@@ -5020,15 +5019,16 @@ if (orderRes && orderRes.orders.length > 0) {
 
     </div>
   `;
-}).join('');
-} else {
-  orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
-}
-  // 自社車両（既存）
+    }).join('');
+  } else {
+    orderList.innerHTML = `<p style="color:#888;">現在新しい注文や通知はありません。</p>`;
+  }
+
+  // 自社車両
   renderCarGrid('my-cars-grid', enrichedCars || [], true);
 
-  // クーポン・セール一覧読み込み
-  loadMyCoupons();
+  // ★ maker を渡して getMakerByUid の重複呼び出しを削減
+  loadMyCoupons(maker);
 }
 // DMモーダルを開く
 // DMモーダルを開く（第3引数に orderId を追加）
@@ -5832,10 +5832,12 @@ async function publishCoupon() {
     loadMyCoupons();
   }
 }
-
 // ★★★ 発行済みクーポン一覧を表示 ★★★
-async function loadMyCoupons() {
-  const maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+async function loadMyCoupons(maker) {
+  // ★ maker が渡されていなければ取得（後方互換）
+  if (!maker) {
+    maker = await callGasApi('getMakerByUid', { uid: window.currentUser.uid });
+  }
   if (!maker) return;
   const coupons = await callGasApi('getMyCoupons', { issuedBy: window.currentUser.uid });
   const container = document.getElementById('coupons-list-container');
@@ -5860,7 +5862,6 @@ async function loadMyCoupons() {
     </div>
   `).join('');
 }
-
 // ★★★ クーポン削除 ★★★
 async function deleteCoupon(couponId) {
   if (!confirm("このクーポンを削除しますか？")) return;
