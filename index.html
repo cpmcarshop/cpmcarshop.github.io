@@ -18,7 +18,7 @@
       } else if (/macintosh|mac os x/i.test(ua)) {
         os = 'ios';
       } else if (/windows/i.test(ua)) {
-        os = 'windows';
+        os = 'windows
       }
 
       // ★ 保存されたテーマ設定を優先（'auto' の場合は検出結果を使用）
@@ -3249,22 +3249,20 @@ function showLoading(text = "データを処理中...", subText = "") {
   const loadingEl = document.getElementById('global-loading');
   if (loadingEl) {
     loadingEl.style.display = 'flex';
-    startProgress();
 
-    // ★ 追加: 前回のpingを表示
+    // 前回の ping をローディング画面に表示
     const pingVal = document.getElementById('loading-ping-value');
     if (pingVal) {
       if (_gasPingStats.avg !== null) {
-        pingVal.textContent = `${_gasPingStats.avg} ms (平均)`;
+        pingVal.textContent = _gasPingStats.avg + ' ms (平均)';
       } else if (_gasPingStats.last !== null) {
-        pingVal.textContent = `${_gasPingStats.last} ms`;
+        pingVal.textContent = _gasPingStats.last + ' ms';
       } else {
         pingVal.textContent = '計測中...';
       }
     }
   }
 }
-
 function hideLoading() {
   activeApiRequests--;
   if (activeApiRequests <= 0) {
@@ -3272,6 +3270,52 @@ function hideLoading() {
     const loadingEl = document.getElementById('global-loading');
     if (loadingEl) loadingEl.style.display = 'none';
   }
+}
+    // ============================================================
+// ★★★ GAS通信速度（ping）計測 ★★★
+// ============================================================
+const _gasPingStats = {
+  last: null,           // 直近の応答時間(ms)
+  lastAction: null,     // 直近のアクション名
+  history: [],          // { action, ms, at, cached }
+  avg: null             // 直近10件の平均
+};
+const GAS_PING_HISTORY_MAX = 50;
+const GAS_PING_AVG_WINDOW = 10;
+
+function recordGasPing(action, ms, cached) {
+  _gasPingStats.last = ms;
+  _gasPingStats.lastAction = action;
+  _gasPingStats.history.unshift({ action: action, ms: ms, at: Date.now(), cached: !!cached });
+  if (_gasPingStats.history.length > GAS_PING_HISTORY_MAX) {
+    _gasPingStats.history.length = GAS_PING_HISTORY_MAX;
+  }
+  const measured = _gasPingStats.history.filter(function(h) { return !h.cached; }).slice(0, GAS_PING_AVG_WINDOW);
+  if (measured.length > 0) {
+    var sum = 0;
+    for (var i = 0; i < measured.length; i++) sum += measured[i].ms;
+    _gasPingStats.avg = Math.round(sum / measured.length);
+  }
+  updateGasPingDisplay();
+}
+
+function updateGasPingDisplay() {
+  var el = document.getElementById('gas-ping-display');
+  if (!el) return;
+  var s = _gasPingStats;
+  if (s.last === null) {
+    el.textContent = '— ms';
+    el.style.color = '#888';
+    return;
+  }
+  var ms = s.last;
+  var color = '#4caf50';
+  if (ms > 3000) color = '#f44336';
+  else if (ms > 1500) color = '#ff9800';
+  else if (ms > 800) color = '#ffd93d';
+  el.textContent = ms + ' ms';
+  el.style.color = color;
+  el.title = '直近: ' + s.lastAction + ' = ' + ms + 'ms\n平均(' + GAS_PING_AVG_WINDOW + '件): ' + (s.avg || '—') + 'ms\n履歴: ' + s.history.length + '件';
 }
     // 画像URLに =rw パラメータを付与（なければ付ける）
 function addRwParam(url) {
@@ -3472,6 +3516,7 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
 
   if (!skipCache && apiCache[cacheKey] && (now - apiCache[cacheKey].timestamp < CACHE_TTL)) {
     console.log('キャッシュ使用: ' + action);
+    recordGasPing(action, 0, true);
     return apiCache[cacheKey].data;
   }
 
@@ -3490,8 +3535,12 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
   }
 
   // ★ 全アクションで最大3回リトライ
+  // ★ 全アクションで最大3回リトライ
   const MAX_RETRY = 3;
   const BASE_DELAY = 800;
+
+  // ★ 追加: 計測用タイマー開始
+  const pingStart = performance.now();
 
   try {
     for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
@@ -3508,6 +3557,9 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
         }
 
         const text = await res.text();
+
+        // ★ 追加: 成功時に計測値を記録
+        recordGasPing(action, Math.round(performance.now() - pingStart), false);
 
         // ★ 非JSONレスポンスを分類
         if (!text.trim().startsWith('{')) {
