@@ -3488,13 +3488,11 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
   }
 
   // ★ 変更: abort をやめて「実行中はスキップ」（abortでGASが無駄実行されるのを防止）
+  // ★ 変更: abort をやめて「実行中はスキップ」（abortでGASが無駄実行されるのを防止）
   if (currentAbortControllers[action]) {
     console.log(`⏸ 実行中のためスキップ: ${action}`);
     return null;
   }
-  const controller = new AbortController();
-  currentAbortControllers[action] = controller;
-  const signal = controller.signal;
   const controller = new AbortController();
   currentAbortControllers[action] = controller;
   const signal = controller.signal;
