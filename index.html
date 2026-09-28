@@ -4342,33 +4342,21 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false, appen
       rankBadge = `<span class="${rankClass}">#${rank}</span>`;
     }
 
-    // ★追加: クーポン・セールバッジ
+    // ★ クーポンバッジ
     let couponBadge = '';
     if (c.hasCoupon) {
       couponBadge = `<span style="position:absolute; top:10px; left:10px; background:#ff6b6b; color:#fff; padding:2px 10px; border-radius:4px; font-size:0.7rem; z-index:6;">🪙 クーポン</span>`;
     }
-    let saleBadge = '';
-    if (c.hasSale) {
-      saleBadge = `<span style="position:absolute; top:10px; left:${c.hasCoupon ? '85px' : '10px'}; background:#ffd93d; color:#000; padding:2px 10px; border-radius:4px; font-size:0.7rem; z-index:6;">🔥 セール</span>`;
-    }
 
-    // ★追加: 価格表示（セール価格がある場合は差し替え）
-    let priceDisplay = '';
-    if (c.salePriceRange) {
-      priceDisplay = `
-        <p style="color:var(--main-color); font-weight:bold; text-decoration:line-through; opacity:0.6;">${c.priceRange}</p>
-        <p style="color:#ff6b6b; font-weight:bold;">${c.salePriceRange}</p>
-      `;
-    } else {
-      priceDisplay = `<p style="color:var(--main-color); font-weight:bold;">${c.priceRange}</p>`;
-    }
+    // ★ 価格表示
+    const priceDisplay = `<p style="color:var(--main-color); font-weight:bold;">${c.priceRange}</p>`;
 
     // ★ メーカーアイコンを取得（フォールバック付き）
 const iconUrl = c.maker?.iconUrl || c.makerIcon || 'https://placehold.co/40x40?text=M';
 
 return `
   <div class="card">
-    ${rankBadge}${couponBadge}${saleBadge}
+    ${rankBadge}${couponBadge}
     <span class="card-badge">${c.status}</span>
     
     <!-- ★ 画像とアイコンをラップ -->
@@ -4566,13 +4554,9 @@ async function openCarDetail(carId) {
         <h4>1. グレード選択</h4>
         <select id="buy-grade" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
  ${car.grades.map(g => {
-  let priceDisplay = Number(g.price).toLocaleString() + ' CR';
-  let label = `${g.gradeName} (+${priceDisplay})`;
-  if (g.salePrice !== undefined && g.salePrice !== null) {
-    const saleDisplay = Number(g.salePrice).toLocaleString() + ' CR';
-    label = `${g.gradeName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
-  }
-  return `<option value="${g.gradeName}" data-price="${g.salePrice !== undefined && g.salePrice !== null ? g.salePrice : g.price}" data-img="${g.imgUrl || ''}">${label}</option>`;
+  const priceDisplay = Number(g.price).toLocaleString() + ' CR';
+  const label = `${g.gradeName} (+${priceDisplay})`;
+  return `<option value="${g.gradeName}" data-price="${g.price}" data-img="${g.imgUrl || ''}">${label}</option>`;
 }).join('')}
 </select>
         <div id="grade-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
@@ -4580,28 +4564,20 @@ async function openCarDetail(carId) {
         <h4>2. カラー選択</h4>
         <select id="buy-color" onchange="updateSubImageDisplay(); calculateTotalPrice();" style="width:100%; padding:8px; background:#0a0c1b; color:#fff;">
   ${car.colors.map(c => {
-    let priceDisplay = Number(c.price).toLocaleString() + ' CR';
-    let label = `${c.colorName} (+${priceDisplay})`;
-    if (c.salePrice !== undefined && c.salePrice !== null) {
-      const saleDisplay = Number(c.salePrice).toLocaleString() + ' CR';
-      label = `${c.colorName} (${saleDisplay} ＜通常 ${priceDisplay}＞)`;
-    }
-    return `<option value="${c.colorName}" data-price="${c.salePrice !== undefined && c.salePrice !== null ? c.salePrice : c.price}" data-img="${c.imgUrl || ''}">${label}</option>`;
+    const priceDisplay = Number(c.price).toLocaleString() + ' CR';
+    const label = `${c.colorName} (+${priceDisplay})`;
+    return `<option value="${c.colorName}" data-price="${c.price}" data-img="${c.imgUrl || ''}">${label}</option>`;
   }).join('')}
 </select>
         <div id="color-image-display" class="sub-image-container"><div class="sub-img-placeholder">画像なし</div></div>
 
         <h4>3. オプション選択</h4>
-        ${car.options.map((o, idx) => {
-  let priceDisplay = Number(o.price).toLocaleString() + ' CR';
-  let label = `${o.optionName} (+${priceDisplay}) - ${o.description}`;
-  if (o.salePrice !== undefined && o.salePrice !== null) {
-    const saleDisplay = Number(o.salePrice).toLocaleString() + ' CR';
-    label = `${o.optionName} (${saleDisplay} ＜通常 ${priceDisplay}＞) - ${o.description}`;
-  }
+               ${car.options.map((o, idx) => {
+  const priceDisplay = Number(o.price).toLocaleString() + ' CR';
+  const label = `${o.optionName} (+${priceDisplay}) - ${o.description}`;
   return `
     <div>
-      <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.salePrice !== undefined && o.salePrice !== null ? o.salePrice : o.price}" data-img="${o.imgUrl || ''}" onchange="updateSubImageDisplay(); calculateTotalPrice();">
+      <input type="checkbox" id="opt-${idx}" class="buy-option-cb" data-name="${o.optionName}" data-price="${o.price}" data-img="${o.imgUrl || ''}" onchange="updateSubImageDisplay(); calculateTotalPrice();">
       <label for="opt-${idx}">${label}</label>
     </div>
   `;
@@ -4643,22 +4619,16 @@ async function openCarDetail(carId) {
 
   const gradeEl = document.getElementById('buy-grade');
   if (gradeEl && gradeEl.selectedOptions[0]) {
-    const gradeName = gradeEl.value;
-    const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
-    total += (grade && grade.salePrice !== undefined && grade.salePrice !== null) ? grade.salePrice : Number(gradeEl.selectedOptions[0].dataset.price || 0);
+    total += Number(gradeEl.selectedOptions[0].dataset.price || 0);
   }
 
   const colorEl = document.getElementById('buy-color');
   if (colorEl && colorEl.selectedOptions[0]) {
-    const colorName = colorEl.value;
-    const color = currentCarDetail.colors.find(c => c.colorName === colorName);
-    total += (color && color.salePrice !== undefined && color.salePrice !== null) ? color.salePrice : Number(colorEl.selectedOptions[0].dataset.price || 0);
+    total += Number(colorEl.selectedOptions[0].dataset.price || 0);
   }
 
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
-    const optName = cb.dataset.name;
-    const opt = currentCarDetail.options.find(o => o.optionName === optName);
-    total += (opt && opt.salePrice !== undefined && opt.salePrice !== null) ? opt.salePrice : Number(cb.dataset.price || 0);
+    total += Number(cb.dataset.price || 0);
   });
 
   // クーポン適用があればその後の処理で割引
@@ -4724,41 +4694,27 @@ function calculateTotalPriceWithCoupon() {
     return;
   }
   
-  // ★★★ デバッグログ（ブラウザのコンソールで確認） ★★★
   console.log('🪙 calculateTotalPriceWithCoupon 開始');
   
-  // ★ セール価格を優先して合計を計算（calculateTotalPrice と同じロジック）
   let total = 0;
 
   const gradeEl = document.getElementById('buy-grade');
   if (gradeEl && gradeEl.selectedOptions[0]) {
-    const gradeName = gradeEl.value;
-    const grade = currentCarDetail.grades.find(g => g.gradeName === gradeName);
-    const price = (grade && grade.salePrice !== undefined && grade.salePrice !== null) 
-      ? grade.salePrice 
-      : Number(gradeEl.selectedOptions[0].dataset.price || 0);
-    console.log(`  グレード「${gradeName}」: ${price} CR`);
+    const price = Number(gradeEl.selectedOptions[0].dataset.price || 0);
+    console.log(`  グレード「${gradeEl.value}」: ${price} CR`);
     total += price;
   }
 
   const colorEl = document.getElementById('buy-color');
   if (colorEl && colorEl.selectedOptions[0]) {
-    const colorName = colorEl.value;
-    const color = currentCarDetail.colors.find(c => c.colorName === colorName);
-    const price = (color && color.salePrice !== undefined && color.salePrice !== null) 
-      ? color.salePrice 
-      : Number(colorEl.selectedOptions[0].dataset.price || 0);
-    console.log(`  カラー「${colorName}」: ${price} CR`);
+    const price = Number(colorEl.selectedOptions[0].dataset.price || 0);
+    console.log(`  カラー「${colorEl.value}」: ${price} CR`);
     total += price;
   }
 
   document.querySelectorAll('.buy-option-cb:checked').forEach(cb => {
-    const optName = cb.dataset.name;
-    const opt = currentCarDetail.options.find(o => o.optionName === optName);
-    const price = (opt && opt.salePrice !== undefined && opt.salePrice !== null) 
-      ? opt.salePrice 
-      : Number(cb.dataset.price || 0);
-    console.log(`  オプション「${optName}」: ${price} CR`);
+    const price = Number(cb.dataset.price || 0);
+    console.log(`  オプション「${cb.dataset.name}」: ${price} CR`);
     total += price;
   });
 
