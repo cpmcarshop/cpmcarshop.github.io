@@ -250,9 +250,29 @@ function stopDealBoardPolling() {
 }
 
 async function closeDealBoard() {
+  const orderId = currentDealOrderId;
+  const uid = window.currentUser ? window.currentUser.uid : null;
+
+  // ★ 閉じる前に必ず既読をサーバーへ送信
+  if (orderId && uid) {
+    const nowISO = new Date().toISOString();
+    setDealReadLocal(orderId, nowISO);
+    try {
+      await callGasApi('markDealBoardRead', {
+        orderId: orderId,
+        uid: uid
+      }, false, true);
+    } catch (e) {
+      console.warn('閉じる時の既読送信失敗', e);
+    }
+  }
+
   stopDealBoardPolling();
   currentDealOrderId = null;
   lastDealBoardTimestamp = null;
+
+  // ★ バッジも即時更新
+  await updateDealBoardBadge();
   closeModal('deal-board-modal');
 }
 
@@ -313,13 +333,28 @@ async function submitDealContent() {
     }
 
     // ★ 成功時: 仮IDをサーバー発行IDに置き換え
-    //   → 次ポーリングで同じメッセージが来ても renderedDealLogIds で弾かれる
     if (result.logId) {
       renderedDealLogIds.delete(tempLogId);
       renderedDealLogIds.add(result.logId);
       const el = document.querySelector(`[data-log-id="${tempLogId}"]`);
       if (el) el.setAttribute('data-log-id', result.logId);
     }
+
+    // ★★★ 追加: 自分の送信で未読カウントが残らないよう即既読化 ★★★
+    const nowISO = new Date().toISOString();
+    setDealReadLocal(currentDealOrderId, nowISO);
+    lastDealBoardTimestamp = nowISO;   // ポーリングの since も前進
+    try {
+      await callGasApi('markDealBoardRead', {
+        orderId: currentDealOrderId,
+        uid: window.currentUser.uid
+      }, false, true);
+    } catch (e) {
+      console.warn('送信後の既読送信失敗', e);
+    }
+    await updateDealBoardBadge();
+    // ★★★ ここまで ★★★
+
     // ★ ここで loadDealBoard() は呼ばない（即時性のため）
   } finally {
     _isSubmittingDeal = false;
@@ -376,27 +411,27 @@ function getDealReadLocal(orderId) {
   const map = getDealReadMapLocal();
   return map[orderId] || null;
 }
-
 async function markDealBoardRead() {
   if (!currentDealOrderId) return;
   const orderId = currentDealOrderId;
+  const uid = window.currentUser.uid;
   const nowISO = new Date().toISOString();
 
-  // ① 【即時】ローカルストレージに保存（GASが失敗しても抑止できる）
+  // ① 【即時】ローカル保存（UI用の保険）
   setDealReadLocal(orderId, nowISO);
 
-  // ② 【即時】バッジを楽観的に更新（サーバー応答を待たない）
-  await updateDealBoardBadge();
-
-  // ③ 【バックグラウンド】GASへ既読を送信（失敗してもUIは既に更新済み）
+  // ② 【先に】サーバーへ既読を反映
   try {
     await callGasApi('markDealBoardRead', {
       orderId: orderId,
-      uid: window.currentUser.uid
-    }, false, true);  // forceRefresh=true でキャッシュ無視
+      uid: uid
+    }, false, true);
   } catch (e) {
     console.warn('GASへの既読送信失敗（ローカルには保存済み）', e);
   }
+
+  // ③ 【最後に】バッジ更新（この時点でサーバーも最新）
+  await updateDealBoardBadge();
 }
 // ---- 未読バッジ ----
 async function updateDealBoardBadge() {
