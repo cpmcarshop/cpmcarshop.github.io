@@ -6,21 +6,42 @@
   <meta name="google" content="notranslate">
   <title>架空車街 | CPM架空車総合ポータル</title>
 
-  <!-- ★★★ 追加：OS自動判定（最速で実行） ★★★ -->
+  <!-- ★★★ 追加：OS自動判定 + カラーモード初期化（最速で実行） ★★★ -->
   <script>
     (function() {
       var ua = navigator.userAgent;
-      var os = 'windows'; // デフォルト
+      var os = 'windows';
       if (/android/i.test(ua)) {
         os = 'android';
       } else if (/iphone|ipad|ipod/i.test(ua)) {
         os = 'ios';
       } else if (/macintosh|mac os x/i.test(ua)) {
-        os = 'ios'; // macOSはiOS風に
+        os = 'ios';
       } else if (/windows/i.test(ua)) {
         os = 'windows';
       }
+
+      // ★ 保存されたテーマ設定を優先（'auto' の場合は検出結果を使用）
+      try {
+        var savedTheme = localStorage.getItem('theme-preference');
+        if (savedTheme === 'windows' || savedTheme === 'android' || savedTheme === 'ios' || savedTheme === 'default') {
+          os = savedTheme;
+        }
+      } catch (e) {}
+
+      // ★ カラーモード（dark / light）
+      var mode = 'dark';
+      try {
+        var savedMode = localStorage.getItem('theme-color-mode');
+        if (savedMode === 'light' || savedMode === 'dark') {
+          mode = savedMode;
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          mode = 'light';
+        }
+      } catch (e) {}
+
       document.documentElement.setAttribute('data-os', os);
+      document.documentElement.setAttribute('data-mode', mode);
     })();
   </script>
 
@@ -900,9 +921,9 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
   left: 10px;
   width: 24px;
   height: 2px;
-  background: #fff;
+  background: var(--hamburger-color, #fff);   /* ★ 変数化（ダーク時は白） */
   border-radius: 2px;
-  transition: top 0.3s ease, transform 0.3s ease, opacity 0.2s ease;
+  transition: top 0.3s ease, transform 0.3s ease, opacity 0.2s ease, background 0.3s ease;
 }
 .hamburger span:nth-child(1) { top: 14px; }
 .hamburger span:nth-child(2) { top: 21px; }
@@ -1051,7 +1072,6 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
   header {
     padding: 6px 8px;
     gap: 4px;
-    /* ★ overflow: hidden は付けない（⋮メニューのため） */
     box-sizing: border-box;
     width: 100%;
   }
@@ -1065,7 +1085,7 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
     letter-spacing: 0.3px;
   }
   #user-display-name {
-    max-width: 48px;                         /* ★ さらに圧縮 */
+    max-width: 48px;
     font-size: 0.65rem !important;
   }
   .btn {
@@ -1084,6 +1104,16 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
   #auth-btn {
     font-size: 0.62rem;
     padding: 4px 6px;
+  }
+  .tab-menu .hamburger {
+    margin: 0;
+  }
+  /* ★ 超狭幅でもアナウンスを1行固定（高さ44px維持） */
+  #announcement-mobile {
+    font-size: 0.7rem;
+    padding: 0 8px;
+    height: 44px;
+    line-height: 1;
   }
 }
     /* デフォルトは非表示（ログイン時のみ表示） */
@@ -1130,41 +1160,64 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
   font-size: 0.85rem;           /* スマホでは少し小さく */
   padding: 2px 10px;
   max-width: 160px;
+  /* ★ 追加：1行固定 + 省略記号で折り返しを防止 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;               /* ★ 追加：残り幅を使いつつ縮小 */
+  min-width: 0;
 }
-
-/* ===== スマホ表示（768px以下） ===== */
 /* ===== スマホ表示（768px以下） ===== */
 @media (max-width: 768px) {
   #announcement-pc { display: none !important; }
+
+  /* アナウンス：高さ44pxちょうどに固定（ハンバーガーと揃える） */
   #announcement-mobile {
-    display: inline-block !important;
-    flex: 0 0 auto;
-    margin: 4px 0 4px 8px;
-    max-width: 250px;
-    font-size: 0.85rem;
-    padding: 2px 10px;
+    display: inline-flex !important;
+    align-items: center;                /* テキストを縦中央に */
+    box-sizing: border-box;             /* padding/border を高さに含める */
+    height: 44px;                       /* ★ 高さを明示（はみ出し防止の要） */
+    line-height: 1;                     /* ★ line-height は無効化 */
+    flex: 1 1 auto;
+    margin: 0 0 0 8px;                  /* 上下マージンなし */
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  /* タブバー：閉じた状態 = 8(padding-top) + 44(ハンバーガー) = 52px に収める */
   .tab-menu {
     flex-direction: row !important;
     flex-wrap: wrap;
     align-items: center;
     padding: 8px 10px;
-    /* ★ max-height は 3-1 で設定済み */
+    box-sizing: border-box;             /* ★ border を高さに含める */
+    max-height: 52px;                   /* ★ 62px → 52px に変更（1段目のみ表示） */
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  .tab-menu.open {
+    max-height: 90vh;                   /* ★ 項目が増えても切れないよう十分確保 */
+  }
+
   .tab-menu .hamburger {
-    width: 44px;                                  /* ★ 修正：3-1と合わせる */
-    height: 44px;                                 /* ★ 修正 */
+    width: 44px;
+    height: 44px;
     flex: 0 0 auto;
     border-bottom: none;
-    margin: 4px 0;
+    margin: 0;
     padding: 0;
   }
+
   .tab-menu .tab-button {
     order: 10;
     flex-basis: 100%;
+    width: 100%;
   }
 }
-
     /* ヘッダーサブロゴ用のスタイル */
     header h1 {
       display: flex;
@@ -1951,6 +2004,675 @@ html[data-os="ios"] .design-option-check {
   color: #0A84FF !important;
 }
 
+/* ============================================================
+   ★★★ デザイン設定モーダル：ライトモード対応 ★★★
+   ============================================================ */
+[data-mode="light"] .design-option {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: transparent;
+}
+[data-mode="light"] .design-option:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 145, 194, 0.4);
+}
+[data-mode="light"] .design-option-title { color: #1a2733; }
+[data-mode="light"] .design-option-desc { color: #666; }
+[data-mode="light"] .modal-content h4 { color: #1a2733; }
+
+/* ============================================================
+   ★★★ ライトモード：デフォルト（スカイ） ★★★
+   ============================================================ */
+html[data-os="default"][data-mode="light"] {
+  --main-color: #0091c2;
+  --bg-color: #ffffff;
+  --card-bg: #f7fbfd;
+  --accent-color: #e94560;
+  --text-color: #1a2733;
+}
+html[data-os="default"][data-mode="light"] body {
+  background: #ffffff;
+  color: #1a2733;
+}
+html[data-os="default"][data-mode="light"] header {
+  background: #e8f6fc !important;
+  border-bottom: 2px solid #0091c2 !important;
+  box-shadow: 0 0 15px rgba(0,145,194,0.15) !important;
+}
+html[data-os="default"][data-mode="light"] header h1 { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .header-sub-logo { color: #0091c2; }
+html[data-os="default"][data-mode="light"] .tab-menu {
+  background: #f2fafd !important;
+  border-bottom: 1px solid #d4e4ec !important;
+}
+html[data-os="default"][data-mode="light"] .tab-button { color: #607585; }
+html[data-os="default"][data-mode="light"] .tab-button.active {
+  color: #0091c2;
+  border-bottom: 3px solid #0091c2;
+  background: rgba(0,145,194,0.08);
+}
+html[data-os="default"][data-mode="light"] .card {
+  background: #f7fbfd !important;
+  border-color: #d4e4ec !important;
+}
+html[data-os="default"][data-mode="light"] .card-title { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .card-subtitle { color: #0091c2; }
+html[data-os="default"][data-mode="light"] .card-img { background: #e4eef4; }
+html[data-os="default"][data-mode="light"] .btn {
+  background: #0091c2 !important;
+  color: #ffffff !important;
+}
+html[data-os="default"][data-mode="light"] .btn:hover { background: #007ab8 !important; }
+html[data-os="default"][data-mode="light"] .btn-secondary {
+  background: #dfe8ed !important;
+  color: #1a2733 !important;
+}
+html[data-os="default"][data-mode="light"] .btn-secondary:hover { background: #d0dce3 !important; }
+html[data-os="default"][data-mode="light"] .btn-danger {
+  background: #e94560 !important;
+  color: #ffffff !important;
+}
+html[data-os="default"][data-mode="light"] .modal-content {
+  background: #ffffff !important;
+  border-color: #0091c2 !important;
+  color: #1a2733;
+}
+html[data-os="default"][data-mode="light"] .modal-content h3,
+html[data-os="default"][data-mode="light"] .modal-content h4 { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .modal-content p { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .form-group label { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .form-group input,
+html[data-os="default"][data-mode="light"] .form-group textarea,
+html[data-os="default"][data-mode="light"] .form-group select {
+  background: #ffffff !important;
+  color: #1a2733 !important;
+  border-color: #cdd9e0 !important;
+}
+html[data-os="default"][data-mode="light"] .notif-box {
+  background: #e4f4fa !important;
+  border-left-color: #0091c2 !important;
+  color: #1a2733;
+}
+html[data-os="default"][data-mode="light"] .notif-box strong { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .sub-item-box {
+  background: #f2fafd !important;
+  border-color: #cdd9e0 !important;
+}
+html[data-os="default"][data-mode="light"] .dropdown-menu {
+  background: #ffffff !important;
+  border-color: #cdd9e0 !important;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+html[data-os="default"][data-mode="light"] .dropdown-menu button { color: #1a2733; }
+html[data-os="default"][data-mode="light"] .dropdown-menu button:hover {
+  background: rgba(0,145,194,0.08);
+  color: #0091c2;
+}
+html[data-os="default"][data-mode="light"] .announcement {
+  background: rgba(0,145,194,0.08) !important;
+  color: #b8770e !important;
+  border-color: #0091c2 !important;
+}
+html[data-os="default"][data-mode="light"] .carousel-container { background: #e8f0f4 !important; }
+html[data-os="default"][data-mode="light"] .carousel-slide img { background: #e8f0f4; }
+html[data-os="default"][data-mode="light"] .carousel-dot { background: #c0cdd5; }
+html[data-os="default"][data-mode="light"] footer {
+  color: #8a9aa6;
+  border-top-color: #d4e4ec;
+}
+html[data-os="default"][data-mode="light"] #global-loading {
+  background: rgba(255,255,255,0.5);
+}
+html[data-os="default"][data-mode="light"] #loading-footer { color: #555; }
+html[data-os="default"][data-mode="light"] .loader { border-color: #0091c2; }
+html[data-os="default"][data-mode="light"] .loader .line { background: #0091c2; }
+html[data-os="default"][data-mode="light"] .loader .subline { background: #0091c2; }
+html[data-os="default"][data-mode="light"] .loader-circle-1 { border-color: #0091c2; border-right-color: transparent; }
+html[data-os="default"][data-mode="light"] .loader .needle { border-color: #0091c2; }
+html[data-os="default"][data-mode="light"] .loader .loading { color: #1a2733; }
+
+/* ============================================================
+   ★★★ ライトモード：Windows 11 (Fluent Light) ★★★
+   ============================================================ */
+html[data-os="windows"][data-mode="light"] {
+  --bg-color: #f3f3f3;
+  --card-bg: #ffffff;
+  --main-color: #005fb8;
+  --text-color: rgba(0,0,0,0.9);
+}
+html[data-os="windows"][data-mode="light"] body {
+  background: #f3f3f3;
+  color: rgba(0,0,0,0.9);
+}
+html[data-os="windows"][data-mode="light"] body::before {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(0,95,184,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(0,95,184,0.03) 0%, transparent 50%);
+}
+html[data-os="windows"][data-mode="light"] header {
+  background: rgba(243,243,243,0.85) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: none !important;
+}
+html[data-os="windows"][data-mode="light"] header h1 { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .header-sub-logo { color: #005fb8; }
+html[data-os="windows"][data-mode="light"] .tab-menu {
+  background: rgba(249,249,249,0.7) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+}
+html[data-os="windows"][data-mode="light"] .tab-button { color: rgba(0,0,0,0.6); }
+html[data-os="windows"][data-mode="light"] .tab-button.active {
+  color: #005fb8;
+  border-bottom: 2px solid #005fb8;
+  background: rgba(0,95,184,0.08);
+}
+html[data-os="windows"][data-mode="light"] .card {
+  background: rgba(255,255,255,0.95) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+}
+html[data-os="windows"][data-mode="light"] .card:hover {
+  background: #ffffff !important;
+  border-color: #005fb8 !important;
+}
+html[data-os="windows"][data-mode="light"] .card-title { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .card-subtitle { color: #005fb8; }
+html[data-os="windows"][data-mode="light"] .card-img { background: #eeeeee; }
+html[data-os="windows"][data-mode="light"] .btn {
+  background: #005fb8 !important;
+  color: #ffffff !important;
+  border-bottom: 2px solid rgba(0,0,0,0.15);
+}
+html[data-os="windows"][data-mode="light"] .btn:hover { background: #1a75c4 !important; }
+html[data-os="windows"][data-mode="light"] .btn:active { background: #004a92 !important; }
+html[data-os="windows"][data-mode="light"] .btn-secondary {
+  background: rgba(0,0,0,0.06) !important;
+  color: rgba(0,0,0,0.9) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-os="windows"][data-mode="light"] .btn-secondary:hover { background: rgba(0,0,0,0.09) !important; }
+html[data-os="windows"][data-mode="light"] .btn-danger { background: #c42b1c !important; color: #ffffff !important; }
+html[data-os="windows"][data-mode="light"] .modal-content {
+  background: rgba(255,255,255,0.97) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important;
+  color: rgba(0,0,0,0.9);
+}
+html[data-os="windows"][data-mode="light"] .modal-content h3,
+html[data-os="windows"][data-mode="light"] .modal-content h4 { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .modal-content p { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .form-group label { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .form-group input,
+html[data-os="windows"][data-mode="light"] .form-group textarea,
+html[data-os="windows"][data-mode="light"] .form-group select {
+  background: #ffffff !important;
+  color: rgba(0,0,0,0.9) !important;
+  border: 1px solid rgba(0,0,0,0.12) !important;
+  border-bottom: 2px solid rgba(0,0,0,0.2) !important;
+}
+html[data-os="windows"][data-mode="light"] .form-group input:focus,
+html[data-os="windows"][data-mode="light"] .form-group textarea:focus,
+html[data-os="windows"][data-mode="light"] .form-group select:focus {
+  border-bottom-color: #005fb8 !important;
+}
+html[data-os="windows"][data-mode="light"] .notif-box {
+  background: #f0f6fc !important;
+  border-left: 3px solid #005fb8 !important;
+  color: rgba(0,0,0,0.9);
+}
+html[data-os="windows"][data-mode="light"] .sub-item-box {
+  background: rgba(0,0,0,0.02) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-os="windows"][data-mode="light"] .dropdown-menu {
+  background: rgba(255,255,255,0.98) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+}
+html[data-os="windows"][data-mode="light"] .dropdown-menu button { color: rgba(0,0,0,0.9); }
+html[data-os="windows"][data-mode="light"] .dropdown-menu button:hover {
+  background: rgba(0,95,184,0.08);
+  color: #005fb8;
+}
+html[data-os="windows"][data-mode="light"] .announcement {
+  background: rgba(0,95,184,0.08) !important;
+  color: #005fb8 !important;
+  border: 1px solid rgba(0,95,184,0.3) !important;
+}
+html[data-os="windows"][data-mode="light"] .carousel-container { background: #f0f0f0 !important; }
+html[data-os="windows"][data-mode="light"] .carousel-slide img { background: #f0f0f0; }
+html[data-os="windows"][data-mode="light"] .carousel-dot { background: #c0c0c0; }
+html[data-os="windows"][data-mode="light"] footer { color: rgba(0,0,0,0.4); border-top-color: rgba(0,0,0,0.08); }
+html[data-os="windows"][data-mode="light"] #global-loading { background: rgba(243,243,243,0.5); }
+html[data-os="windows"][data-mode="light"] #loading-footer { color: #444; }
+html[data-os="windows"][data-mode="light"] .loader { border-color: #005fb8; }
+html[data-os="windows"][data-mode="light"] .loader .line { background: #005fb8; }
+html[data-os="windows"][data-mode="light"] .loader .subline { background: #005fb8; }
+html[data-os="windows"][data-mode="light"] .loader-circle-1 { border-color: #005fb8; border-right-color: transparent; }
+html[data-os="windows"][data-mode="light"] .loader .needle { border-color: #005fb8; }
+html[data-os="windows"][data-mode="light"] .loader .loading { color: #1a1a1a; }
+
+/* ============================================================
+   ★★★ ライトモード：Android (Material Design 3 Light) ★★★
+   ※ 薄水色系を維持しつつ M3 ライト用トーンに調整
+   ============================================================ */
+html[data-os="android"][data-mode="light"] {
+  --bg-color: #f5fbfd;
+  --card-bg: #ffffff;
+  --main-color: #006876;
+  --text-color: #171c1e;
+}
+html[data-os="android"][data-mode="light"] body {
+  background: #f5fbfd;
+  color: #171c1e;
+  font-family: 'Roboto', system-ui, sans-serif;
+}
+html[data-os="android"][data-mode="light"] body::before {
+  background:
+    radial-gradient(ellipse at 10% 90%, rgba(0,104,118,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 10%, rgba(0,104,118,0.04) 0%, transparent 50%);
+}
+html[data-os="android"][data-mode="light"] header {
+  background: #ffffff !important;
+  border-bottom: none !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+}
+html[data-os="android"][data-mode="light"] header h1 { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .header-sub-logo { color: #006876; }
+html[data-os="android"][data-mode="light"] .tab-menu {
+  background: #ffffff !important;
+  border-bottom: none !important;
+}
+html[data-os="android"][data-mode="light"] .tab-button {
+  color: #3f484b;
+}
+html[data-os="android"][data-mode="light"] .tab-button.active {
+  background: #97f0ff !important;
+  color: #001f26 !important;
+}
+html[data-os="android"][data-mode="light"] .card {
+  background: #ffffff !important;
+  border: 1px solid #dbe4e7 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+}
+html[data-os="android"][data-mode="light"] .card:hover {
+  border-color: #006876 !important;
+  box-shadow: 0 4px 12px rgba(0,104,118,0.12) !important;
+}
+html[data-os="android"][data-mode="light"] .card-title { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .card-subtitle { color: #006876; }
+html[data-os="android"][data-mode="light"] .card-img { background: #e0e6e8; }
+html[data-os="android"][data-mode="light"] .btn {
+  background: #006876 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+html[data-os="android"][data-mode="light"] .btn:hover {
+  background: #0088a0 !important;
+  box-shadow: 0 2px 8px rgba(0,104,118,0.25);
+}
+html[data-os="android"][data-mode="light"] .btn:active { background: #004f5b !important; box-shadow: none; }
+html[data-os="android"][data-mode="light"] .btn-secondary {
+  background: #e0e6e8 !important;
+  color: #171c1e !important;
+}
+html[data-os="android"][data-mode="light"] .btn-secondary:hover { background: #d0d7da !important; }
+html[data-os="android"][data-mode="light"] .btn-danger { background: #ba1a1a !important; color: #ffffff !important; }
+html[data-os="android"][data-mode="light"] .modal-content {
+  background: #ffffff !important;
+  border: 1px solid #dbe4e7 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+  color: #171c1e;
+}
+html[data-os="android"][data-mode="light"] .modal-content h3,
+html[data-os="android"][data-mode="light"] .modal-content h4 { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .modal-content p { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .form-group label { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .form-group input,
+html[data-os="android"][data-mode="light"] .form-group textarea,
+html[data-os="android"][data-mode="light"] .form-group select {
+  background: #f5fbfd !important;
+  border: 1px solid #dbe4e7 !important;
+  color: #171c1e !important;
+}
+html[data-os="android"][data-mode="light"] .form-group input:focus,
+html[data-os="android"][data-mode="light"] .form-group textarea:focus,
+html[data-os="android"][data-mode="light"] .form-group select:focus {
+  border-color: #006876 !important;
+  box-shadow: 0 0 0 1px #006876 !important;
+}
+html[data-os="android"][data-mode="light"] .notif-box {
+  background: #e4f5f9 !important;
+  border: 1px solid #dbe4e7 !important;
+  border-left: none !important;
+  color: #171c1e;
+}
+html[data-os="android"][data-mode="light"] .sub-item-box {
+  background: #f5fbfd !important;
+  border: 1px solid #dbe4e7 !important;
+}
+html[data-os="android"][data-mode="light"] .dropdown-menu {
+  background: #ffffff !important;
+  border: 1px solid #dbe4e7 !important;
+}
+html[data-os="android"][data-mode="light"] .dropdown-menu button { color: #171c1e; }
+html[data-os="android"][data-mode="light"] .dropdown-menu button:hover {
+  background: rgba(0,104,118,0.08);
+  color: #006876;
+}
+html[data-os="android"][data-mode="light"] .announcement {
+  background: #e4f5f9 !important;
+  color: #006876 !important;
+  border: none !important;
+}
+html[data-os="android"][data-mode="light"] .card-badge {
+  background: #ba1a1a !important;
+  color: #ffffff !important;
+}
+html[data-os="android"][data-mode="light"] .carousel-container { background: #e0e6e8 !important; }
+html[data-os="android"][data-mode="light"] .carousel-slide img { background: #e0e6e8; }
+html[data-os="android"][data-mode="light"] .carousel-dot { background: #b0bcc0; }
+html[data-os="android"][data-mode="light"] footer { color: #6f797b; border-top-color: #dbe4e7; }
+html[data-os="android"][data-mode="light"] #global-loading { background: rgba(245,251,253,0.5); }
+html[data-os="android"][data-mode="light"] #loading-footer { color: #3f484b; }
+html[data-os="android"][data-mode="light"] .loader { border-color: #006876; }
+html[data-os="android"][data-mode="light"] .loader .line { background: #006876; }
+html[data-os="android"][data-mode="light"] .loader .subline { background: #006876; }
+html[data-os="android"][data-mode="light"] .loader-circle-1 { border-color: #006876; border-right-color: transparent; }
+html[data-os="android"][data-mode="light"] .loader .needle { border-color: #006876; }
+html[data-os="android"][data-mode="light"] .loader .loading { color: #171c1e; }
+
+/* ============================================================
+   ★★★ ライトモード：iOS (Cupertino Light / Liquid Glass) ★★★
+   ============================================================ */
+html[data-os="ios"][data-mode="light"] {
+  --bg-color: #f2f2f7;
+  --card-bg: #ffffff;
+  --main-color: #007aff;
+  --text-color: #1c1c1e;
+}
+html[data-os="ios"][data-mode="light"] body {
+  background: #f2f2f7;
+  color: #1c1c1e;
+}
+html[data-os="ios"][data-mode="light"] body::before {
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(0,122,255,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(255,59,48,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.4) 0%, transparent 70%);
+}
+html[data-os="ios"][data-mode="light"] header {
+  background: rgba(255,255,255,0.72) !important;
+  backdrop-filter: blur(50px) saturate(2);
+  -webkit-backdrop-filter: blur(50px) saturate(2);
+  border-bottom: 1px solid rgba(0,0,0,0.1) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset !important;
+}
+html[data-os="ios"][data-mode="light"] header h1 { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .header-sub-logo { color: #007aff; }
+html[data-os="ios"][data-mode="light"] .tab-menu {
+  background: rgba(242,242,247,0.72) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-os="ios"][data-mode="light"] .tab-button { color: #8e8e93; }
+html[data-os="ios"][data-mode="light"] .tab-button.active {
+  background: rgba(0,122,255,0.15) !important;
+  color: #007aff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 1px 4px rgba(0,122,255,0.1);
+}
+html[data-os="ios"][data-mode="light"] .card {
+  background: rgba(255,255,255,0.85) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -1px 0 rgba(0,0,0,0.04),
+    0 8px 32px rgba(0,0,0,0.08) !important;
+}
+html[data-os="ios"][data-mode="light"] .card::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
+}
+html[data-os="ios"][data-mode="light"] .card:hover {
+  background: rgba(255,255,255,0.95) !important;
+  border-color: rgba(0,122,255,0.35) !important;
+}
+html[data-os="ios"][data-mode="light"] .card-title { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .card-subtitle { color: #007aff; }
+html[data-os="ios"][data-mode="light"] .card-img { background: #e5e5ea; }
+html[data-os="ios"][data-mode="light"] .btn {
+  background: rgba(0,122,255,0.92) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    inset 0 -1px 0 rgba(0,0,0,0.08),
+    0 2px 12px rgba(0,122,255,0.25);
+}
+html[data-os="ios"][data-mode="light"] .btn:hover { background: rgba(0,122,255,1) !important; }
+html[data-os="ios"][data-mode="light"] .btn-secondary {
+  background: rgba(0,0,0,0.06) !important;
+  color: #007aff !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 2px 8px rgba(0,0,0,0.06);
+}
+html[data-os="ios"][data-mode="light"] .btn-secondary:hover { background: rgba(0,0,0,0.1) !important; }
+html[data-os="ios"][data-mode="light"] .btn-danger {
+  background: rgba(255,59,48,0.92) !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    0 2px 12px rgba(255,59,48,0.25);
+}
+html[data-os="ios"][data-mode="light"] .modal {
+  background: rgba(0,0,0,0.3);
+}
+html[data-os="ios"][data-mode="light"] .modal-content {
+  background: rgba(255,255,255,0.85) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -1px 0 rgba(0,0,0,0.05),
+    0 12px 48px rgba(0,0,0,0.15) !important;
+  color: #1c1c1e;
+}
+html[data-os="ios"][data-mode="light"] .modal-content::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
+}
+html[data-os="ios"][data-mode="light"] .modal-content h3,
+html[data-os="ios"][data-mode="light"] .modal-content h4 { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .modal-content p { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .form-group label { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .form-group input,
+html[data-os="ios"][data-mode="light"] .form-group textarea,
+html[data-os="ios"][data-mode="light"] .form-group select {
+  background: rgba(255,255,255,0.9) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  color: #1c1c1e !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+html[data-os="ios"][data-mode="light"] .form-group input:focus,
+html[data-os="ios"][data-mode="light"] .form-group textarea:focus,
+html[data-os="ios"][data-mode="light"] .form-group select:focus {
+  border-color: rgba(0,122,255,0.5) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 0 0 3px rgba(0,122,255,0.2);
+}
+html[data-os="ios"][data-mode="light"] .notif-box {
+  background: rgba(0,122,255,0.06) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  border-left: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 4px 20px rgba(0,0,0,0.06);
+  color: #1c1c1e;
+}
+html[data-os="ios"][data-mode="light"] .sub-item-box {
+  background: rgba(255,255,255,0.6) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+html[data-os="ios"][data-mode="light"] .dropdown-menu {
+  background: rgba(255,255,255,0.9) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 12px 40px rgba(0,0,0,0.15);
+}
+html[data-os="ios"][data-mode="light"] .dropdown-menu button { color: #1c1c1e; }
+html[data-os="ios"][data-mode="light"] .dropdown-menu button:hover {
+  background: rgba(0,122,255,0.12);
+  color: #007aff;
+}
+html[data-os="ios"][data-mode="light"] .announcement {
+  background: rgba(255,255,255,0.85) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: #007aff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+html[data-os="ios"][data-mode="light"] .card-badge {
+  background: rgba(255,59,48,0.85) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+html[data-os="ios"][data-mode="light"] .carousel-container {
+  background: #e5e5ea !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 8px 32px rgba(0,0,0,0.08);
+}
+html[data-os="ios"][data-mode="light"] .carousel-slide img { background: #e5e5ea; }
+html[data-os="ios"][data-mode="light"] .carousel-dot { background: #c7c7cc; }
+html[data-os="ios"][data-mode="light"] footer { color: #8e8e93; border-top-color: rgba(0,0,0,0.08); }
+html[data-os="ios"][data-mode="light"] #global-loading { background: rgba(242,242,247,0.5); }
+html[data-os="ios"][data-mode="light"] #loading-footer { color: #3c3c43; }
+html[data-os="ios"][data-mode="light"] .loader { border-color: #007aff; }
+html[data-os="ios"][data-mode="light"] .loader .line { background: #007aff; }
+html[data-os="ios"][data-mode="light"] .loader .subline { background: #007aff; }
+html[data-os="ios"][data-mode="light"] .loader-circle-1 { border-color: #007aff; border-right-color: transparent; }
+html[data-os="ios"][data-mode="light"] .loader .needle { border-color: #007aff; }
+html[data-os="ios"][data-mode="light"] .loader .loading { color: #1c1c1e; }
+
+/* ============================================================
+   ★★★ デザイン設定モーダル：ライトモード選択時のハイライト ★★★
+   ============================================================ */
+html[data-os="default"][data-mode="light"] .design-option.selected {
+  background: rgba(0, 145, 194, 0.12) !important;
+  border-color: #0091c2 !important;
+}
+html[data-os="default"][data-mode="light"] .design-option:hover { border-color: #0091c2 !important; }
+html[data-os="default"][data-mode="light"] .design-option-check { color: #0091c2 !important; }
+
+html[data-os="windows"][data-mode="light"] .design-option.selected {
+  background: rgba(0, 95, 184, 0.12) !important;
+  border-color: #005fb8 !important;
+}
+html[data-os="windows"][data-mode="light"] .design-option:hover { border-color: #005fb8 !important; }
+html[data-os="windows"][data-mode="light"] .design-option-check { color: #005fb8 !important; }
+
+html[data-os="android"][data-mode="light"] .design-option.selected {
+  background: rgba(0, 104, 118, 0.15) !important;
+  border-color: #006876 !important;
+}
+html[data-os="android"][data-mode="light"] .design-option:hover { border-color: #006876 !important; }
+html[data-os="android"][data-mode="light"] .design-option-check { color: #006876 !important; }
+
+html[data-os="ios"][data-mode="light"] .design-option.selected {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: rgba(0, 122, 255, 0.5) !important;
+}
+html[data-os="ios"][data-mode="light"] .design-option:hover { border-color: rgba(0, 122, 255, 0.4) !important; }
+html[data-os="ios"][data-mode="light"] .design-option-check { color: #007aff !important; }
+
+/* ============================================================
+   ★★★ ハンバーガーメニュー：モード別カラー ★★★
+   ============================================================ */
+/* ダークモード：白（デフォルト） */
+html[data-mode="dark"] {
+  --hamburger-color: #fff;
+}
+
+/* ライトモード：各OSのテキスト色に合わせる */
+html[data-mode="light"] {
+  --hamburger-color: #333;                     /* 汎用フォールバック */
+}
+html[data-os="default"][data-mode="light"] {
+  --hamburger-color: #1a2733;                  /* スカイ系：ほぼ黒 */
+}
+html[data-os="windows"][data-mode="light"] {
+  --hamburger-color: rgba(0, 0, 0, 0.9);       /* Fluent Light：黒に近い */
+}
+html[data-os="android"][data-mode="light"] {
+  --hamburger-color: #171c1e;                  /* Material 3 Light：オンサーフェス */
+}
+html[data-os="ios"][data-mode="light"] {
+  --hamburger-color: #1c1c1e;                  /* Cupertino Light：ラベル色 */
+}
+
+/* ============================================================
+   ★★★ 追加：ハンバーガーがタブバー上で確実に前面に出るように ★★★
+   （ライトモード時、タブバー背景と被って見えにくいのを防止）
+   ============================================================ */
+html[data-mode="light"] .tab-menu .hamburger {
+  background: transparent;
+}
+
+/* ============================================================
+   ★★★ インラインstyle上書き：テキスト色のモード対応 ★★★
+   ============================================================ */
+
+/* ホームの「架空車の販売情報が…」 */
+#free-text-area {
+  color: var(--body-text-color, #ccc) !important;
+}
+html[data-mode="dark"] {
+  --body-text-color: #ccc;
+}
+html[data-mode="light"] {
+  --body-text-color: #444;                     /* 汎用 */
+}
+html[data-os="default"][data-mode="light"] { --body-text-color: #2a3a47; }
+html[data-os="windows"][data-mode="light"] { --body-text-color: rgba(0,0,0,0.75); }
+html[data-os="android"][data-mode="light"] { --body-text-color: #3f484b; }
+html[data-os="ios"][data-mode="light"]     { --body-text-color: #3c3c43; }
+
+/* ============================================================
+   ★★★ デザイン設定モーダル：テキスト色のモード対応 ★★★
+   （ダーク時に「ライト」の文字が読めない問題を修正）
+   ============================================================ */
+.design-option-title {
+  color: var(--design-opt-title, #fff) !important;
+}
+.design-option-desc {
+  color: var(--design-opt-desc, #aaa) !important;
+}
+html[data-mode="dark"] {
+  --design-opt-title: #fff;
+  --design-opt-desc: #aaa;
+}
+html[data-mode="light"] {
+  --design-opt-title: #1a2733;
+  --design-opt-desc: #666;
+}
+
+/* モーダル全体の見出し・説明文もモード追従に統一 */
+.modal-content h3,
+.modal-content h4 {
+  color: var(--modal-heading, #fff) !important;
+}
+.modal-content p {
+  color: var(--modal-body, #aaa) !important;
+}
+html[data-mode="dark"] {
+  --modal-heading: #fff;
+  --modal-body: #aaa;
+}
+html[data-mode="light"] {
+  --modal-heading: #1a2733;
+  --modal-body: #555;
+}
+
   </style>
 </head>
 <body>
@@ -2308,14 +3030,26 @@ html[data-os="ios"] .design-option-check {
     <div class="modal-content" style="max-width: 480px;">
       <h3>🎨 デザイン設定</h3>
       <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 20px;">
-        お好みのOS風デザインを選択できます。変更は即座に反映され、次回訪問時も維持されます。
+        お好みのOS風デザインとカラーモードを選択できます。変更は即座に反映され、次回訪問時も維持されます。
       </p>
+
+      <!-- ===== デザインセクション ===== -->
+      <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; opacity: 0.7;">デザイン</h4>
 
       <div class="design-option" data-theme="auto" onclick="applyDesignTheme('auto')">
         <div class="design-option-icon">🔄</div>
         <div class="design-option-info">
           <div class="design-option-title">自動</div>
           <div class="design-option-desc">お使いの端末に合わせて自動選択</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div class="design-option" data-theme="default" onclick="applyDesignTheme('default')">
+        <div class="design-option-icon">🎨</div>
+        <div class="design-option-info">
+          <div class="design-option-title">デフォルト</div>
+          <div class="design-option-desc">架空車街 オリジナル</div>
         </div>
         <div class="design-option-check">✓</div>
       </div>
@@ -2343,6 +3077,27 @@ html[data-os="ios"] .design-option-check {
         <div class="design-option-info">
           <div class="design-option-title">Cupertino</div>
           <div class="design-option-desc">Liquid Glass</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <!-- ===== カラーモードセクション ===== -->
+      <h4 style="margin: 24px 0 10px 0; font-size: 0.9rem; opacity: 0.7; border-top: 1px solid rgba(128,128,128,0.25); padding-top: 16px;">カラーモード</h4>
+
+      <div class="design-option" data-mode="dark" onclick="applyColorMode('dark')">
+        <div class="design-option-icon">🌙</div>
+        <div class="design-option-info">
+          <div class="design-option-title">ダーク</div>
+          <div class="design-option-desc">暗い背景のテーマ</div>
+        </div>
+        <div class="design-option-check">✓</div>
+      </div>
+
+      <div class="design-option" data-mode="light" onclick="applyColorMode('light')">
+        <div class="design-option-icon">☀️</div>
+        <div class="design-option-info">
+          <div class="design-option-title">ライト</div>
+          <div class="design-option-desc">明るい背景のテーマ</div>
         </div>
         <div class="design-option-check">✓</div>
       </div>
@@ -5377,6 +6132,7 @@ window.addEventListener('click', function() {
    ★★★ デザイン設定 ★★★
    ============================================================ */
 const THEME_STORAGE_KEY = 'theme-preference';
+const MODE_STORAGE_KEY = 'theme-color-mode';
 
 // 現在のOSを検出（自動モード時に使用）
 function detectOSTheme() {
@@ -5385,55 +6141,84 @@ function detectOSTheme() {
   if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
   if (/macintosh|mac os x/i.test(ua)) return 'ios';
   if (/windows/i.test(ua)) return 'windows';
-  return 'windows'; // 不明な端末はWindows風
+  return 'windows';
 }
 
-// 保存された設定を取得（'auto' | 'windows' | 'android' | 'ios'）
+// 保存されたデザイン設定を取得
 function getSavedTheme() {
   try {
     var saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === 'windows' || saved === 'android' || saved === 'ios' || saved === 'auto') {
+    if (saved === 'windows' || saved === 'android' || saved === 'ios' || saved === 'default' || saved === 'auto') {
       return saved;
     }
   } catch (e) {}
-  return 'auto'; // 初回は自動
+  return 'auto';
 }
 
-// テーマを適用（即時切替 + 保存）
+// 保存されたカラーモードを取得（未設定ならシステム設定に従う）
+function getSavedMode() {
+  try {
+    var saved = localStorage.getItem(MODE_STORAGE_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch (e) {}
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    return 'light';
+  }
+  return 'dark';
+}
+
+// デザインテーマを適用（即時切替 + 保存）
 function applyDesignTheme(theme) {
-  // theme: 'auto' | 'windows' | 'android' | 'ios'
   var os;
   if (theme === 'auto') {
     os = detectOSTheme();
+  } else if (theme === 'default') {
+    os = 'default';
   } else {
     os = theme;
   }
 
-  // 即時反映
   document.documentElement.setAttribute('data-os', os);
 
-  // 保存（'auto' も保存するので、次回訪問時に「自動」の選択状態を再現できる）
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch (e) {
     console.warn('テーマ設定の保存に失敗しました', e);
   }
 
-  // モーダル内の選択状態を更新
   updateDesignSelection(theme);
 }
 
-// モーダル内の選択ハイライトを更新
+// ★ カラーモードを適用（即時切替 + 保存）
+function applyColorMode(mode) {
+  document.documentElement.setAttribute('data-mode', mode);
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch (e) {
+    console.warn('カラーモード保存失敗', e);
+  }
+  updateModeSelection(mode);
+}
+
+// モーダル内のデザイン選択ハイライトを更新
 function updateDesignSelection(theme) {
-  document.querySelectorAll('.design-option').forEach(function(el) {
+  document.querySelectorAll('.design-option[data-theme]').forEach(function(el) {
     el.classList.toggle('selected', el.dataset.theme === theme);
+  });
+}
+
+// ★ モーダル内のカラーモード選択ハイライトを更新
+function updateModeSelection(mode) {
+  document.querySelectorAll('.design-option[data-mode]').forEach(function(el) {
+    el.classList.toggle('selected', el.dataset.mode === mode);
   });
 }
 
 // デザイン設定モーダルを開く
 function openDesignSettings() {
-  closeSupportMenu(); // ⋮メニューを閉じる
-  updateDesignSelection(getSavedTheme()); // 現在の設定を反映
+  closeSupportMenu();
+  updateDesignSelection(getSavedTheme());
+  updateModeSelection(getSavedMode());  // ★ 追加
   document.getElementById('design-settings-modal').style.display = 'flex';
 }
 
