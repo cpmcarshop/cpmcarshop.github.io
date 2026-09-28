@@ -432,43 +432,12 @@ async function markDealBoardRead() {
   await updateDealBoardBadge();
 }
 // ---- 未読バッジ ----
+// ---- 未読バッジ（無効化） ----
 async function updateDealBoardBadge() {
-  if (!window.currentUser) return;
-
-  // ★ forceRefresh=true で常に最新を取得（キャッシュ事故防止）
-  const result = await callGasApi('getDealBoardUnreadCount', {
-    uid: window.currentUser.uid
-  }, false, true);
-
+  // ★ 通知バッジ機能は使わないので何もしない
   const badge = document.getElementById('deal-board-badge');
-  if (!badge) return;
-
-  // ★ サーバーから取れなかった場合は現状維持（消してしまわない）
-  if (!result) return;
-
-  // ★★★ 追加: ローカル既読マップを反映してカウントを再計算 ★★★
-  const localMap = getDealReadMapLocal();
-  const serverOrders = result.orders || {};        // { orderId: 最新未読メッセージのタイムスタンプ }
-  const perOrderCount = result.perOrderCount || {}; // { orderId: 未読メッセージ数 }
-
-  let count = 0;
-  for (const orderId in serverOrders) {
-    const serverTs = serverOrders[orderId];
-    const localRead = localMap[orderId];
-
-    // ローカルの既読タイムスタンプ >= サーバーの最新未読タイムスタンプ なら既読扱い
-    if (localRead && new Date(localRead).getTime() >= new Date(serverTs).getTime()) {
-      continue;  // スキップ（＝ローカルで既読済み）
-    }
-    count += perOrderCount[orderId] || 1;
-  }
-
-  if (count > 0) {
-    badge.style.display = 'inline-block';
-    badge.innerText = count > 99 ? '99+' : count;
-  } else {
-    badge.style.display = 'none';
-  }
+  if (badge) badge.style.display = 'none';
+  return;
 }
 
 // ---- 取引ボード一覧 ----
@@ -2732,6 +2701,20 @@ html[data-mode="light"] {
       <div class="loading">Loading</div>
     </div>
   </div>
+    <!-- ★★★ 追加: ローディング中のping表示 ★★★ -->
+  <div id="loading-ping" style="
+    text-align: center;
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 8px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    position: relative;
+    z-index: 20;
+  ">
+    前回の応答: <span id="loading-ping-value">—</span>
+  </div>
+
+
 <div id="loading-footer">
   <div class="highlight">サーバーと通信中...</div>
   ※いつまでたっても進まない場合はページを再読み込みしてください。<br>
@@ -3265,15 +3248,20 @@ function showLoading(text = "データを処理中...", subText = "") {
   activeApiRequests++;
   const loadingEl = document.getElementById('global-loading');
   if (loadingEl) {
-    // ★ 要素が存在する場合のみ更新（存在しない場合は無視）
-    const textEl = document.getElementById('loading-text');
-    if (textEl) textEl.innerText = text;
-    const subEl = document.getElementById('loading-sub');
-    if (subEl) {
-      subEl.innerText = subText;
-      subEl.style.display = subText ? 'block' : 'none';
-    }
     loadingEl.style.display = 'flex';
+    startProgress();
+
+    // ★ 追加: 前回のpingを表示
+    const pingVal = document.getElementById('loading-ping-value');
+    if (pingVal) {
+      if (_gasPingStats.avg !== null) {
+        pingVal.textContent = `${_gasPingStats.avg} ms (平均)`;
+      } else if (_gasPingStats.last !== null) {
+        pingVal.textContent = `${_gasPingStats.last} ms`;
+      } else {
+        pingVal.textContent = '計測中...';
+      }
+    }
   }
 }
 
