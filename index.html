@@ -253,26 +253,24 @@ async function closeDealBoard() {
   const orderId = currentDealOrderId;
   const uid = window.currentUser ? window.currentUser.uid : null;
 
-  // ★ 閉じる前に必ず既読をサーバーへ送信
   if (orderId && uid) {
     const nowISO = new Date().toISOString();
     setDealReadLocal(orderId, nowISO);
-    try {
-      await callGasApi('markDealBoardRead', {
-        orderId: orderId,
-        uid: uid
-      }, false, true);
-    } catch (e) {
-      console.warn('閉じる時の既読送信失敗', e);
-    }
+    // ★ サーバー送信はするが await しない（UIをブロックしない）
+    callGasApi('markDealBoardRead', {
+      orderId: orderId,
+      uid: uid
+    }, false, true).catch(() => {});
   }
 
   stopDealBoardPolling();
   currentDealOrderId = null;
   lastDealBoardTimestamp = null;
 
-  // ★ バッジも即時更新
-  await updateDealBoardBadge();
+  // ★ バッジ更新はローカルの値だけで再計算（サーバーは叩かない）
+  //    → updateDealBoardBadge を使わず、ローカル既読マップから直接計算
+  const badge = document.getElementById('deal-board-badge');
+  if (badge) badge.style.display = 'none';  // 閉じた取引分は即座に消す
   closeModal('deal-board-modal');
 }
 
@@ -3208,7 +3206,7 @@ const auth = getAuth(app);
     document.getElementById('mypage-tab').classList.add('is-visible');
 document.getElementById('deal-board-nav-btn').style.display = 'inline-block';
 setTimeout(() => updateDealBoardBadge(), 3000);
-setInterval(() => updateDealBoardBadge(), 60000);  // ★ 60秒に
+setInterval(() => updateDealBoardBadge(), 120000);  // ★ 60秒 → 120秒に延長
     // ★ registerUser を強制更新（キャッシュを無視）
     const userInfo = await callGasApi('registerUser', {
       uid: user.uid,
