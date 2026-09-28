@@ -18,9 +18,8 @@
       } else if (/macintosh|mac os x/i.test(ua)) {
         os = 'ios';
       } else if (/windows/i.test(ua)) {
-        os = 'windows
+        os = 'windows';
       }
-
       // ★ 保存されたテーマ設定を優先（'auto' の場合は検出結果を使用）
       try {
         var savedTheme = localStorage.getItem('theme-preference');
