@@ -3451,7 +3451,30 @@ const apiCache = {};
 const CACHE_TTL = 60000; // 60秒
 let isInitialLoad = true; // 初期ロード中かどうか
 
+// ★ 追加: アクション別の連打防止（同一アクションの最小再実行間隔 ms）
+const ACTION_THROTTLE_MS = {
+  'updateDealBoardBadge': 0,      // 内部で使わないので実質無関係
+  'getDealBoardUnreadCount': 2000,
+  'markDealBoardRead': 1500,
+  'getUserOrders': 1000,
+  'getMakerOrders': 1000,
+  'getDealBoard': 500,
+  'getDealBoardSince': 3000
+};
+const _lastCallTime = {};
+
 async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRefresh = false) {
+  // ★ 追加: スロットルチェック
+  const throttle = ACTION_THROTTLE_MS[action] || 0;
+  if (throttle > 0 && _lastCallTime[action]) {
+    const elapsed = Date.now() - _lastCallTime[action];
+    if (elapsed < throttle) {
+      console.log(`⏱ スロットル: ${action} (あと${throttle - elapsed}ms)`);
+      return null;   // 直前とほぼ同時実行はスキップ
+    }
+  }
+  _lastCallTime[action] = Date.now();
+
   const cacheKey = action + JSON.stringify(payload);
   const now = Date.now();
 
@@ -3466,9 +3489,14 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     return apiCache[cacheKey].data;
   }
 
+  // ★ 変更: abort をやめて「実行中はスキップ」（abortでGASが無駄実行されるのを防止）
   if (currentAbortControllers[action]) {
-    currentAbortControllers[action].abort();
+    console.log(`⏸ 実行中のためスキップ: ${action}`);
+    return null;
   }
+  const controller = new AbortController();
+  currentAbortControllers[action] = controller;
+  const signal = controller.signal;
   const controller = new AbortController();
   currentAbortControllers[action] = controller;
   const signal = controller.signal;
