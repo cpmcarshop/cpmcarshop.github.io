@@ -2674,6 +2674,56 @@ html[data-mode="light"] {
   --modal-body: #555;
 }
 
+/* ============================================================
+   ★ ファイル選択欄をカスタムUI化
+   ============================================================ */
+input[type="file"].cfi-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cfi-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  vertical-align: middle;
+  margin: 4px 0;
+}
+.cfi-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #0f1428;
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #fff;
+  transition: 0.15s;
+  user-select: none;
+}
+.cfi-btn:hover {
+  background: #16213e;
+  border-color: #00d2ff;
+}
+.cfi-status {
+  font-size: 0.8rem;
+  color: #888;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cfi-status.cfi-done {
+  color: #4caf50;
+}
+.file-status { display: none !important; }
+
   </style>
 </head>
 <body>
@@ -3180,16 +3230,35 @@ const auth = getAuth(app);
         console.error('リダイレクトエラー:', error);
       });
     
-   onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     window.currentUser = user;
+
+    // ★★★ 最優先：BANチェック（UIを一切触る前に） ★★★
+    try {
+      const banCheck = await callGasApi('checkBan', { uid: user.uid }, false, true);
+      if (banCheck && banCheck.banned) {
+        const url = GAS_URL + '?page=goodbye' +
+          (banCheck.remaining ? '&days=' + encodeURIComponent(banCheck.remaining) : '');
+        window.location.replace(url);   // 履歴に残さず即移動
+        return;                         // 以降の処理は全部スキップ
+      }
+    } catch (e) {
+      console.warn('BANチェック失敗:', e);
+      // 失敗しても進行（BANされていない可能性の方が高い）
+    }
+
+    // ★ BANじゃないと確定してから、初めてUIとロードを動かす
     document.getElementById('user-display-name').innerText = '認証中...';
     document.getElementById('auth-btn').innerText = '管理';
     document.getElementById('mypage-tab').classList.add('is-visible');
-document.getElementById('deal-board-nav-btn').style.display = 'inline-block';
-setTimeout(() => updateDealBoardBadge(), 3000);
-setInterval(() => updateDealBoardBadge(), 120000);  // ★ 60秒 → 120秒に延長
-    // ★ registerUser を強制更新（キャッシュを無視）
+    document.getElementById('deal-board-nav-btn').style.display = 'inline-block';
+    setTimeout(() => updateDealBoardBadge(), 3000);
+    setInterval(() => updateDealBoardBadge(), 120000);
+
+    // ★ ここで初めて車両をロード
+    window.triggerInitialLoad && window.triggerInitialLoad();
+
     const userInfo = await callGasApi('registerUser', {
       uid: user.uid,
       name: '',
@@ -3225,19 +3294,22 @@ setInterval(() => updateDealBoardBadge(), 120000);  // ★ 60秒 → 120秒に�
     checkAndShowAnnouncements();
 
   } else {
-    // ログアウト時
+    // ログアウト時：未ログインとして通常ロード
     window.currentUser = null;
     document.getElementById('user-display-name').innerText = '';
     document.getElementById('auth-btn').innerText = 'ログイン / 登録';
     document.getElementById('mypage-tab').classList.remove('is-visible');
     document.getElementById('deal-board-nav-btn').style.display = 'none';
+
+    // ★ 未ログインでも車両は見せる
+    window.triggerInitialLoad && window.triggerInitialLoad();
   }
 });
   
 </script>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxv9-_xWXwFtD-bY-de5r65KkLI-JSTwLE2ebe98RbAyzWClSvrDxJoo6XD7gs1hS00/exec"; // GASのWebアプリURL
+ var GAS_URL = "https://kakuusha-gai.paapaapaa810.workers.dev";
 const currentAbortControllers = {};   // ★ action ごとに保持
 let currentSelectedMakerId = null;
     // ローディング状態管理カウンター
@@ -5688,6 +5760,9 @@ function confirmEditor() {
     statusSpan.style.fontWeight = 'bold';
   }
 
+  // ★ カスタムUIに「編集済み」を反映
+  if (editorFileInput) editorFileInput.dispatchEvent(new Event('cfi-refresh'));
+
   closeEditorModal();
   document.getElementById('editor-status').textContent = '✅ 編集完了！';
 }
@@ -6388,10 +6463,25 @@ loadHomeCars = async function(force = false) {
   }
 };
 
-    // 初期表示
-loadHomeCars();
-loadAnnouncement(); // ★ 追加
-    setupInfiniteScroll();
+// ============================================================
+// ★ BANチェック完了まで初期ロードを保留
+// ============================================================
+let _initialLoadTriggered = false;
+
+function triggerInitialLoad() {
+  if (_initialLoadTriggered) return;
+  _initialLoadTriggered = true;
+  loadHomeCars();
+  loadAnnouncement();
+  setupInfiniteScroll();
+}
+
+// フェイルセーフ：2秒以内に認証が解決しなければ、通常ロード（未ログイン扱い）
+setTimeout(triggerInitialLoad, 2000);
+
+// グローバルに公開（onAuthStateChanged から呼ぶため）
+window.triggerInitialLoad = triggerInitialLoad;
+window._bannedCheckInProgress = true;
 // ============================================================
 // スクロールに合わせたヘッダー表示/非表示（方向検知＋閾値版）
 // ============================================================
@@ -6461,6 +6551,83 @@ loadAnnouncement(); // ★ 追加
     updateHeaderHeight();
   }, 500);
 })(); 
+
+// ============================================================
+// ★ ファイル選択欄をカスタムUI化
+// ============================================================
+(function () {
+  function buildCustomUI(input) {
+    if (input.dataset.cfiReady === '1') return;
+    input.dataset.cfiReady = '1';
+
+    input.classList.add('cfi-hidden');
+
+    const wrap = document.createElement('span');
+    wrap.className = 'cfi-wrap';
+
+    const btn = document.createElement('span');
+    btn.className = 'cfi-btn';
+    btn.innerHTML = '📁 <span class="cfi-label">ファイルを選択</span>';
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      input.click();
+    });
+
+    const status = document.createElement('span');
+    status.className = 'cfi-status';
+
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(btn);
+    wrap.appendChild(status);
+    wrap.appendChild(input);
+
+    function refresh() {
+      const label = btn.querySelector('.cfi-label');
+      if (input.dataset.editedBase64) {
+        status.textContent = '✅ 編集済み';
+        status.classList.add('cfi-done');
+        label.textContent = '別の画像を選択';
+      } else if (input.files && input.files[0]) {
+        status.textContent = input.files[0].name;
+        status.classList.add('cfi-done');
+        label.textContent = '別の画像を選択';
+      } else {
+        status.textContent = '未選択';
+        status.classList.remove('cfi-done');
+        label.textContent = 'ファイルを選択';
+      }
+    }
+
+    input.addEventListener('change', refresh);
+    input.addEventListener('cfi-refresh', refresh);
+    refresh();
+  }
+
+  function applyAll() {
+    document.querySelectorAll('input[type="file"]').forEach(buildCustomUI);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyAll);
+  } else {
+    applyAll();
+  }
+
+  const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.matches && n.matches('input[type="file"]')) buildCustomUI(n);
+        if (n.querySelectorAll) {
+          n.querySelectorAll('input[type="file"]').forEach(buildCustomUI);
+        }
+      });
+    });
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+})();
   </script>
 
   
