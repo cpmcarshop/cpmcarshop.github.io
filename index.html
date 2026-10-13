@@ -3310,6 +3310,14 @@ onAuthStateChanged(auth, async (user) => {
 
   <script>
  var GAS_URL = "https://kakuusha-gai.paapaapaa810.workers.dev";
+
+// ★ 起動時からローディングを表示（BANチェック完了まで隠さない）
+window._bootLoadingActive = true;
+(function () {
+  var el = document.getElementById('global-loading');
+  if (el) el.style.display = 'flex';
+})();
+
 const currentAbortControllers = {};   // ★ action ごとに保持
 let currentSelectedMakerId = null;
     // ローディング状態管理カウンター
@@ -3338,6 +3346,8 @@ function hideLoading() {
   activeApiRequests--;
   if (activeApiRequests <= 0) {
     activeApiRequests = 0;
+    // ★ 起動ローディング中は隠さない
+    if (window._bootLoadingActive) return;
     const loadingEl = document.getElementById('global-loading');
     if (loadingEl) loadingEl.style.display = 'none';
   }
@@ -6471,7 +6481,14 @@ let _initialLoadTriggered = false;
 function triggerInitialLoad() {
   if (_initialLoadTriggered) return;
   _initialLoadTriggered = true;
-  loadHomeCars();
+
+  // ★ 車両ロードが完了したら、起動ローディングを解除
+  loadHomeCars().finally(() => {
+    window._bootLoadingActive = false;
+    var el = document.getElementById('global-loading');
+    if (el) el.style.display = 'none';
+  });
+
   loadAnnouncement();
   setupInfiniteScroll();
 }
