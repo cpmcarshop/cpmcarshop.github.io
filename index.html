@@ -2723,7 +2723,16 @@ input[type="file"].cfi-hidden {
   color: #4caf50;
 }
 .file-status { display: none !important; }
-
+/* ★ 受注停止・完売の車両を視覚的に暗く */
+.card.card-dimmed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  border-radius: 8px;
+  z-index: 3;
+}
   </style>
 </head>
 <body>
@@ -4438,8 +4447,9 @@ function renderCarGrid(targetId, cars, isMyCars = false, showRank = false, appen
     // ★ メーカーアイコンを取得（フォールバック付き）
 const iconUrl = c.maker?.iconUrl || c.makerIcon || 'https://placehold.co/40x40?text=M';
 
+const isDimmed = c.status === '受注停止' || c.status === '完売';
 return `
-  <div class="card">
+  <div class="card${isDimmed ? ' card-dimmed' : ''}">
     ${rankBadge}${couponBadge}
     <span class="card-badge">${c.status}</span>
     
