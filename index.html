@@ -568,10 +568,40 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
     .form-group { margin-bottom: 15px; }
     .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
     .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; background: #0f1428; border: 1px solid #333; color: #fff; border-radius: 4px; box-sizing: border-box; }
+  
     
-    /* モーダル */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; overflow-y: auto; }
-    .modal-content { background: var(--card-bg); padding: 25px; border-radius: 8px; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--main-color); }
+    /* モーダル：フェードイン・フェードアウト */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-y: auto;
+
+  opacity: 0;
+  transition: opacity 180ms ease, display 180ms allow-discrete;
+}
+
+.modal[style*="display: flex"],
+.modal[style*="display:flex"] {
+  opacity: 1;
+}
+
+@starting-style {
+  .modal[style*="display: flex"],
+  .modal[style*="display:flex"] {
+    opacity: 0;
+  }
+}
+
+/* ↓ この行は元のまま残す */
+.modal-content { background: var(--card-bg); padding: 25px; border-radius: 8px; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--main-color); }
     .sub-item-box { background: #0a0c1b; padding: 10px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #444; }
 
     /* 通知バッジ */
@@ -3003,7 +3033,7 @@ input[type="file"].cfi-hidden {
     </div>
   </div>
 
-  <!-- モーダル: 車両詳細を見る -->
+  <!-- モーダル: 車両詳細・購入 -->
   <div id="detail-modal" class="modal">
     <div class="modal-content">
       <div id="detail-modal-body"></div>
@@ -4814,7 +4844,7 @@ return `
     </div>
 ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
 <div style="display:flex; gap:5px; flex-wrap:wrap;">
-  <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細を見る</button>
+  <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
   <button class="btn btn-secondary" style="flex:0 0 40px; font-size:0.8rem; padding:8px 0;" onclick="event.stopPropagation(); shareCarLink('${c.carId}', '${c.carName}')">📤</button>
   ${isMyCars ? `
     <button class="btn btn-secondary" style="flex:1;" onclick="editCar('${c.carId}')">編集</button>
