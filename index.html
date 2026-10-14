@@ -3010,37 +3010,184 @@ input[type="file"].cfi-hidden {
     </div>
   </div>
 
-  <!-- Auth Modal (Firebase) -->
-  <!-- Auth Modal (Firebase) 内の修正 -->
+
+<!-- Auth Modal (Firebase) -->
 <div id="auth-modal" class="modal">
-  <div class="modal-content" style="max-width: 400px; text-align: center;">
-    <!-- ★★★ ログインビュー（デフォルト） ★★★ -->
+  <div class="modal-content" style="max-width:400px; text-align:center;">
+
+    <!-- ログイン・新規登録ビュー -->
     <div id="auth-login-view">
-      <h3>アカウント ログイン / 登録</h3>
-      <div class="form-group"><input type="email" id="auth-email" placeholder="メールアドレス"></div>
-      <div class="form-group"><input type="password" id="auth-password" placeholder="パスワード"></div>
-      <button class="btn" onclick="handleEmailAuth('login')" style="width: 100%; margin-bottom: 10px;">メールでログイン</button>
-      <button class="btn btn-secondary" onclick="handleEmailAuth('register')" style="width: 100%; margin-bottom: 10px;">新規アカウント登録</button>
-      <!-- ★ パスワードリセットリンク（エラー時のみ表示するが、常に表示でも可） -->
-      <div id="reset-password-link" style="margin-top: 10px; display: none;">
-        <a href="#" onclick="showResetView(); return false;" style="color: var(--main-color);">パスワードをお忘れですか？</a>
+
+      <h3 id="auth-title">おかえりなさい</h3>
+      <p id="auth-description" style="font-size:0.9rem; color:#aaa; margin-bottom:18px;">
+        登録したメールアドレスでログインしてください。
+      </p>
+
+      <!-- ログイン / 新規登録の切り替え -->
+      <div id="auth-mode-switch" style="display:flex; gap:8px; margin-bottom:16px;">
+        <button
+          type="button"
+          id="auth-login-tab"
+          class="btn"
+          onclick="setAuthMode('login')"
+          style="flex:1;">
+          ログイン
+        </button>
+        <button
+          type="button"
+          id="auth-register-tab"
+          class="btn btn-secondary"
+          onclick="setAuthMode('register')"
+          style="flex:1;">
+          新規登録
+        </button>
       </div>
-      <hr style="border-color: #333; margin: 15px 0;">
-      <button class="btn" onclick="handleGoogleAuth()" style="width: 100%; background: #4285F4; color: #fff;">Googleアカウントでログイン</button>
-      <br><br>
-      <button class="btn btn-secondary" onclick="closeModal('auth-modal')">閉じる</button>
+
+      <!-- メールアドレス -->
+      <div class="form-group">
+        <input
+          type="email"
+          id="auth-email"
+          placeholder="メールアドレス"
+          autocomplete="email"
+          style="width:100%; box-sizing:border-box;"
+          onkeydown="if(event.key==='Enter') handleEmailAuth(currentAuthMode)">
+      </div>
+
+      <!-- パスワード + 表示切り替え -->
+      <div class="form-group" style="display:flex; gap:6px; align-items:stretch;">
+        <input
+          type="password"
+          id="auth-password"
+          placeholder="パスワード"
+          autocomplete="current-password"
+          style="flex:1; min-width:0; box-sizing:border-box;"
+          onkeydown="if(event.key==='Enter') handleEmailAuth(currentAuthMode)">
+        <button
+          type="button"
+          id="auth-password-toggle"
+          class="btn btn-secondary"
+          onclick="toggleAuthPassword()"
+          aria-label="パスワードを表示"
+          style="white-space:nowrap;">
+          表示
+        </button>
+      </div>
+
+      <!-- エラーメッセージ / 成功メッセージ -->
+      <div
+        id="auth-status"
+        role="status"
+        aria-live="polite"
+        style="display:none; text-align:left; font-size:0.9rem; margin:10px 0 14px; overflow-wrap:anywhere;">
+      </div>
+
+      <!-- メインの認証ボタン -->
+      <button
+        type="button"
+        class="btn"
+        id="auth-submit-btn"
+        onclick="handleEmailAuth(currentAuthMode)"
+        style="width:100%; margin-bottom:10px;">
+        ログインする
+      </button>
+
+      <!-- パスワードリセットへの移動 -->
+      <div id="reset-password-link" style="margin:10px 0 14px;">
+        <a
+          href="#"
+          onclick="showResetView(); return false;"
+          style="color:var(--main-color);">
+          パスワードをお忘れですか？
+        </a>
+      </div>
+
+      <hr style="border-color:#333; margin:15px 0;">
+
+      <!-- Googleログイン -->
+      <button
+        type="button"
+        class="btn"
+        id="auth-google-btn"
+        onclick="handleGoogleAuth()"
+        style="width:100%; background:#4285F4; color:#fff; display:flex; align-items:center; justify-content:center; gap:10px;">
+
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 48 48"
+          aria-hidden="true"
+          style="flex-shrink:0;">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 3.15 13.22l7.98 6.19C13.02 13.72 18.06 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.18l7.66 5.95c4.47-4.13 7.11-10.2 7.11-17.6z"/>
+          <path fill="#FBBC05" d="M11.13 28.59A14.4 14.4 0 0 1 10.35 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 3.15 10.78l7.98-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.85l-7.66-5.95c-2.13 1.43-4.85 2.28-8.24 2.28-5.94 0-10.98-4.22-12.87-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+
+        <span>Googleでログイン</span>
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-secondary"
+        onclick="closeModal('auth-modal')"
+        style="width:100%; margin-top:14px;">
+        閉じる
+      </button>
+
     </div>
 
-    <!-- ★★★ パスワードリセットビュー（初期は非表示） ★★★ -->
-    <div id="auth-reset-view" style="display: none;">
+    <!-- パスワードリセットビュー -->
+    <div id="auth-reset-view" style="display:none;">
+
       <h3>パスワードリセット</h3>
-      <p style="color: #aaa; font-size: 0.9rem;">登録済みのメールアドレスを入力すると、リセットリンクを送信します。</p>
-      <div class="form-group"><input type="email" id="reset-email" placeholder="メールアドレス"></div>
-      <button class="btn" id="reset-send-btn" onclick="sendPasswordReset()" style="width: 100%; margin-bottom: 10px;">リセットメールを送信</button>
-      <div id="reset-status" style="font-size: 0.9rem; margin-bottom: 10px;"></div>
-      <div id="reset-cooldown" style="font-size: 0.85rem; color: #888;"></div>
-      <button class="btn btn-secondary" onclick="showLoginView(); return false;" style="width: 100%;">戻る</button>
+
+      <p style="color:#aaa; font-size:0.9rem;">
+        登録済みのメールアドレスを入力すると、リセットリンクを送信します。
+      </p>
+
+      <div class="form-group">
+        <input
+          type="email"
+          id="reset-email"
+          placeholder="メールアドレス"
+          autocomplete="email"
+          style="width:100%; box-sizing:border-box;">
+      </div>
+
+      <div
+        id="reset-status"
+        role="status"
+        aria-live="polite"
+        style="font-size:0.9rem; margin-bottom:10px; overflow-wrap:anywhere;">
+      </div>
+
+      <div
+        id="reset-cooldown"
+        style="font-size:0.85rem; color:#888; margin-bottom:10px;">
+      </div>
+
+      <button
+        type="button"
+        class="btn"
+        id="reset-send-btn"
+        onclick="sendPasswordReset()"
+        style="width:100%; margin-bottom:10px;">
+        リセットメールを送信
+      </button>
+
+      <!-- リセット画面ではタブを表示せず、戻るボタンを表示 -->
+      <button
+        type="button"
+        class="btn btn-secondary"
+        onclick="showLoginView()"
+        style="width:100%;">
+        ← ログインに戻る
+      </button>
+
     </div>
+
   </div>
 </div>
 
@@ -3838,54 +3985,249 @@ closeModal = function(id) {
 
     // メール認証
   // 修正後
-function handleGoogleAuth() {
-  const provider = new window.GoogleAuthProvider();
 
-  // ポップアップ方式のみを使用する（リダイレクトにはフォールバックしない）
-  window.signInWithPopup(window.firebaseAuth, provider)
-    .then(() => {
-      closeModal('auth-modal');
-    })
-    .catch((error) => {
-      // ポップアップがブロックされた場合のエラーハンドリング
-      if (error.code === 'auth/popup-blocked') {
-        alert(
-          'ポップアップがブロックされました。\n' +
-          'ブラウザの設定でポップアップを許可してから、もう一度「Googleアカウントでログイン」ボタンをクリックしてください。'
-        );
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        // ユーザーがポップアップを閉じた場合は何もしない（または軽くメッセージ）
-        console.log('ログインポップアップが閉じられました。');
-      } else {
-        alert('ログインエラー: ' + error.message);
-      }
-    });
+async function handleGoogleAuth() {
+  const button = document.getElementById('auth-google-btn');
+
+  if (button.disabled) return;
+
+  button.disabled = true;
+  setAuthStatus('');
+
+  try {
+    const provider = new window.GoogleAuthProvider();
+
+    await window.signInWithPopup(
+      window.firebaseAuth,
+      provider
+    );
+
+    closeModal('auth-modal');
+
+  } catch (error) {
+    if (error.code === 'auth/popup-closed-by-user') {
+      // ユーザーが自分で閉じた場合はエラー表示しない
+      return;
+    }
+
+    if (error.code === 'auth/popup-blocked') {
+      setAuthStatus(
+        'Googleログインのポップアップがブロックされました。ブラウザの設定で許可して再度お試しください。'
+      );
+    } else if (error.code === 'auth/network-request-failed') {
+      setAuthStatus(
+        '通信に失敗しました。ネットワークを確認して再度お試しください。'
+      );
+    } else {
+      console.error('Google認証エラー:', error);
+      setAuthStatus(
+        'Googleログインに失敗しました。時間をおいて再度お試しください。'
+      );
+    }
+
+  } finally {
+    button.disabled = false;
+  }
 }
-    function handleEmailAuth(type) {
-  const email = document.getElementById('auth-email').value;
-  const pass = document.getElementById('auth-password').value;
-  if (!email || !pass) return alert("メアドとパスワードを入力してください");
 
-  const authFunc = type === 'login' 
-    ? window.signInWithEmailAndPassword(window.firebaseAuth, email, pass)
-    : window.createUserWithEmailAndPassword(window.firebaseAuth, email, pass);
 
-  authFunc
-    .then(() => {
-      closeModal('auth-modal');
-      // エラー表示用リンクを非表示にリセット
-      document.getElementById('reset-password-link').style.display = 'none';
-    })
-    .catch(e => {
-      // ★ パスワード間違いの場合、リセットリンクを表示
-      if (e.code === 'auth/wrong-password') {
-        document.getElementById('reset-password-link').style.display = 'block';
-        alert('パスワードが間違っています。\n「パスワードをお忘れですか？」からリセットしてください。');
-      } else {
-        alert(e.message);
-      }
-    });
+// 現在選択されている認証モード
+let currentAuthMode = 'login';
+
+// モーダル内の状態メッセージ
+function setAuthStatus(message, type = 'error') {
+  const el = document.getElementById('auth-status');
+  if (!el) return;
+
+  el.textContent = message;
+  el.style.display = message ? 'block' : 'none';
+  el.style.color = type === 'success' ? '#4caf50' : '#e94560';
 }
+
+// ログイン / 新規登録の切り替え
+function setAuthMode(mode) {
+  currentAuthMode = mode === 'register' ? 'register' : 'login';
+
+  const isLogin = currentAuthMode === 'login';
+  const title = document.getElementById('auth-title');
+  const description = document.getElementById('auth-description');
+  const loginTab = document.getElementById('auth-login-tab');
+  const registerTab = document.getElementById('auth-register-tab');
+  const submit = document.getElementById('auth-submit-btn');
+  const password = document.getElementById('auth-password');
+  const toggle = document.getElementById('auth-password-toggle');
+
+  title.textContent = isLogin ? 'おかえりなさい' : 'アカウントを作成';
+  description.textContent = isLogin
+    ? '登録したメールアドレスでログインしてください。'
+    : 'メールアドレスとパスワードを登録してください。';
+
+  submit.textContent = isLogin ? 'ログインする' : 'アカウントを作成する';
+
+  loginTab.className = isLogin ? 'btn' : 'btn btn-secondary';
+  registerTab.className = isLogin ? 'btn btn-secondary' : 'btn';
+
+  loginTab.setAttribute('aria-pressed', String(isLogin));
+  registerTab.setAttribute('aria-pressed', String(!isLogin));
+
+  // ブラウザの自動入力ヒントもモードに合わせる
+  password.autocomplete = isLogin ? 'current-password' : 'new-password';
+
+  // 切り替え時にパスワードを隠す
+  password.type = 'password';
+  toggle.textContent = '表示';
+  toggle.setAttribute('aria-label', 'パスワードを表示');
+
+  setAuthStatus('');
+}
+
+// パスワード表示 / 非表示
+function toggleAuthPassword() {
+  const password = document.getElementById('auth-password');
+  const toggle = document.getElementById('auth-password-toggle');
+  const show = password.type === 'password';
+
+  password.type = show ? 'text' : 'password';
+  toggle.textContent = show ? '隠す' : '表示';
+  toggle.setAttribute(
+    'aria-label',
+    show ? 'パスワードを隠す' : 'パスワードを表示'
+  );
+}
+
+// Firebaseエラーをユーザー向けの文章に変換
+function getAuthErrorMessage(error, mode) {
+  const code = error && error.code ? error.code : '';
+
+  if (code === 'auth/invalid-email') {
+    return 'メールアドレスの形式を確認してください。';
+  }
+
+  if (code === 'auth/email-already-in-use') {
+    return 'このメールアドレスはすでに登録されています。ログインをお試しください。';
+  }
+
+  if (code === 'auth/weak-password') {
+    return 'パスワードが短すぎます。より長いパスワードを設定してください。';
+  }
+
+  if (
+    code === 'auth/wrong-password' ||
+    code === 'auth/user-not-found' ||
+    code === 'auth/invalid-credential' ||
+    code === 'auth/invalid-login-credentials'
+  ) {
+    return 'メールアドレスまたはパスワードが正しくありません。入力内容をご確認ください。';
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return '試行回数が多すぎます。しばらく待ってから再度お試しください。';
+  }
+
+  if (code === 'auth/network-request-failed') {
+    return '通信に失敗しました。ネットワークを確認して再度お試しください。';
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    return 'この認証方法は現在利用できません。管理者にお問い合わせください。';
+  }
+
+  return mode === 'register'
+    ? 'アカウントを作成できませんでした。入力内容や通信状態をご確認ください。'
+    : 'ログインできませんでした。入力内容や通信状態をご確認ください。';
+}
+
+// メール認証
+async function handleEmailAuth(type) {
+  const mode = type === 'register' ? 'register' : 'login';
+
+  // 別のモードのボタンが呼ばれた場合も表示を同期
+  if (currentAuthMode !== mode) {
+    setAuthMode(mode);
+  }
+
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+  const submit = document.getElementById('auth-submit-btn');
+  const loginTab = document.getElementById('auth-login-tab');
+  const registerTab = document.getElementById('auth-register-tab');
+  const googleBtn = document.getElementById('auth-google-btn');
+
+  const email = emailInput.value.trim();
+  const pass = passwordInput.value;
+
+  if (!email || !pass) {
+    setAuthStatus('メールアドレスとパスワードを入力してください。');
+    return;
+  }
+
+  if (!emailInput.checkValidity()) {
+    setAuthStatus('メールアドレスの形式を確認してください。');
+    emailInput.focus();
+    return;
+  }
+
+  if (mode === 'register' && pass.length < 6) {
+    setAuthStatus('パスワードは6文字以上で入力してください。');
+    passwordInput.focus();
+    return;
+  }
+
+  // 連続クリックによる二重送信を防ぐ
+  if (submit.disabled) return;
+
+  submit.disabled = true;
+  loginTab.disabled = true;
+  registerTab.disabled = true;
+  googleBtn.disabled = true;
+  submit.textContent = mode === 'login' ? 'ログイン中...' : '登録中...';
+  setAuthStatus('');
+
+  try {
+    if (!window.firebaseAuth) {
+      throw new Error('認証サービスを初期化できませんでした。ページを再読み込みしてください。');
+    }
+
+    if (mode === 'login') {
+      await window.signInWithEmailAndPassword(
+        window.firebaseAuth,
+        email,
+        pass
+      );
+    } else {
+      await window.createUserWithEmailAndPassword(
+        window.firebaseAuth,
+        email,
+        pass
+      );
+    }
+
+    // 成功した場合は既存のサイト処理に任せてモーダルを閉じる
+    closeModal('auth-modal');
+    passwordInput.value = '';
+    setAuthStatus('');
+
+  } catch (error) {
+    console.error('メール認証エラー:', error);
+
+    const message = error.code
+      ? getAuthErrorMessage(error, mode)
+      : (error.message || '認証に失敗しました。');
+
+    setAuthStatus(message);
+
+  } finally {
+    submit.disabled = false;
+    loginTab.disabled = false;
+    registerTab.disabled = false;
+    googleBtn.disabled = false;
+
+    submit.textContent = mode === 'login'
+      ? 'ログインする'
+      : 'アカウントを作成する';
+  }
+}
+
 
     function openAccountManagement() {
   if (!window.currentUser) return;
@@ -6379,23 +6721,46 @@ function openDesignSettings() {
 let resetCooldownTimer = null;
 let resetCooldownSeconds = 0;
 
-// ログインビューを表示（リセットビューから戻る）
+// ログイン / 新規登録画面に戻る
 function showLoginView() {
   document.getElementById('auth-login-view').style.display = 'block';
   document.getElementById('auth-reset-view').style.display = 'none';
-  document.getElementById('reset-password-link').style.display = 'none'; // エラー時表示用
+
+  // リセット画面から戻ったらログインモードにする
+  setAuthMode('login');
+  setAuthStatus('');
 }
 
-// リセットビューを表示
+// パスワードリセット画面へ移動
 function showResetView() {
-  document.getElementById('auth-login-view').style.display = 'none';
-  document.getElementById('auth-reset-view').style.display = 'block';
-  document.getElementById('reset-email').value = document.getElementById('auth-email').value || '';
+  const loginView = document.getElementById('auth-login-view');
+  const resetView = document.getElementById('auth-reset-view');
+  const resetEmail = document.getElementById('reset-email');
+
+  // ログイン画面を隠すことで、タブも一緒に隠す
+  loginView.style.display = 'none';
+  resetView.style.display = 'block';
+
+  // 入力済みメールアドレスを引き継ぐ
+  resetEmail.value = document.getElementById('auth-email').value.trim();
+
+  // 前回の結果表示をリセット
   document.getElementById('reset-status').textContent = '';
   document.getElementById('reset-cooldown').textContent = '';
-  document.getElementById('reset-send-btn').disabled = false;
-  document.getElementById('reset-send-btn').textContent = 'リセットメールを送信';
+
+  // 送信ボタンを初期化
+  const resetButton = document.getElementById('reset-send-btn');
+  resetButton.disabled = false;
+  resetButton.textContent = 'リセットメールを送信';
+
+  // 古いクールタイマーが残っている場合は停止
+  if (resetCooldownTimer) {
+    clearInterval(resetCooldownTimer);
+    resetCooldownTimer = null;
+  }
+  resetCooldownSeconds = 0;
 }
+
 
 
 // パスワードリセットメール送信（Firebase標準機能）
