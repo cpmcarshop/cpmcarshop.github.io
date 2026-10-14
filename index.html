@@ -3003,7 +3003,7 @@ input[type="file"].cfi-hidden {
     </div>
   </div>
 
-  <!-- モーダル: 車両詳細・購入 -->
+  <!-- モーダル: 車両詳細を見る -->
   <div id="detail-modal" class="modal">
     <div class="modal-content">
       <div id="detail-modal-body"></div>
@@ -4814,7 +4814,7 @@ return `
     </div>
 ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.salesCount}台</p>` : ''}
 <div style="display:flex; gap:5px; flex-wrap:wrap;">
-  <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細・購入</button>
+  <button class="btn" style="flex:1;" onclick="openCarDetail('${c.carId}')">詳細を見る</button>
   <button class="btn btn-secondary" style="flex:0 0 40px; font-size:0.8rem; padding:8px 0;" onclick="event.stopPropagation(); shareCarLink('${c.carId}', '${c.carName}')">📤</button>
   ${isMyCars ? `
     <button class="btn btn-secondary" style="flex:1;" onclick="editCar('${c.carId}')">編集</button>
