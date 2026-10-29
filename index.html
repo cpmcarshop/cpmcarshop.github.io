@@ -6931,32 +6931,43 @@ function initFromUrl() {
   if (car) {
     switchTab('home', false);
     openCarDetail(car, false);
-  } else {
-    switchTab(tab, false);
-    if (tab === 'search') {
-      const keyword = params.get('keyword') || '';
-      const genre = params.get('genre') || 'all';
-      const sort = params.get('sort') || 'new';
-      const makerId = params.get('makerId');
-      if (makerId) {
-        currentSelectedMakerId = makerId;
-        document.getElementById('reset-search-btn').style.display = 'inline-block';
-        callGasApi('getMakers', {}, false).then(makers => {
-          const m = makers?.find(x => x.makerId === makerId);
-          document.getElementById('search-title').innerText = m ? `「${m.makerName}」の車両一覧` : 'メーカー指定検索';
-        }).catch(() => {
-          document.getElementById('search-title').innerText = 'メーカー指定検索';
-        });
-      } else {
-        currentSelectedMakerId = null;
-        document.getElementById('reset-search-btn').style.display = 'none';
-        document.getElementById('search-title').innerText = '架空車 総合検索';
-      }
-      document.getElementById('search-keyword').value = keyword;
-      document.getElementById('search-genre').value = genre;
-      document.getElementById('search-sort').value = sort;
-      executeSearch(false);
+    return;
+  }
+
+  // ★ 検索タブの場合、先に条件をDOMにセットする（switchTabより前！）
+  if (tab === 'search') {
+    const keyword = params.get('keyword') || '';
+    const genre = params.get('genre') || 'all';
+    const sort = params.get('sort') || 'new';
+    const makerId = params.get('makerId');
+
+    if (makerId) {
+      currentSelectedMakerId = makerId;
+      document.getElementById('reset-search-btn').style.display = 'inline-block';
+      // タイトル更新は非同期でOK
+      callGasApi('getMakers', {}, false).then(makers => {
+        const m = makers?.find(x => x.makerId === makerId);
+        document.getElementById('search-title').innerText = m ? `「${m.makerName}」の車両一覧` : 'メーカー指定検索';
+      }).catch(() => {
+        document.getElementById('search-title').innerText = 'メーカー指定検索';
+      });
+    } else {
+      currentSelectedMakerId = null;
+      document.getElementById('reset-search-btn').style.display = 'none';
+      document.getElementById('search-title').innerText = '架空車 総合検索';
     }
+
+    // ★ 検索条件をDOMに反映（ここが重要）
+    document.getElementById('search-keyword').value = keyword;
+    document.getElementById('search-genre').value = genre;
+    document.getElementById('search-sort').value = sort;
+    // currentSort も合わせて更新しておく
+    currentSort = sort;
+  }
+
+  // ★ 最後にタブを切り替える（switchTab 内で executeSearch(false) が呼ばれる）
+  switchTab(tab, false);
+}
   }
 }
 
