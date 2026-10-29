@@ -3962,7 +3962,7 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
     }
 
     // タブ切替
-   async function switchTab(tabId) {
+async function switchTab(tabId, push = true) {
   // タブのアクティブ化処理（共通部分）はそのまま
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
@@ -3970,23 +3970,25 @@ const dataUrl = canvas.toDataURL('image/webp', quality);
   const tabBtn = document.getElementById('tab-btn-' + tabId) || (tabId === 'mypage' ? document.getElementById('mypage-tab') : null);
   if (tabBtn) tabBtn.classList.add('active');
 
+  // ★ URLを更新
+  if (push) updateUrlForTab(tabId, true);
+
   // ★ ホームタブの場合
   if (tabId === 'home') {
-  const cacheKey = 'getCars{"sortBy":"view"}';
-  const cached = apiCache[cacheKey];
-  // ★★★ cached.data.cars の存在確認を追加 ★★★
-  if (cached && cached.data && cached.data.cars && (Date.now() - cached.timestamp < CACHE_TTL)) {
-    const enrichedCached = await enrichCarsWithMakerIcons(cached.data.cars);
-    renderCarGrid('home-car-grid', enrichedCached);
+    const cacheKey = 'getCars{"sortBy":"view"}';
+    const cached = apiCache[cacheKey];
+    if (cached && cached.data && cached.data.cars && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      const enrichedCached = await enrichCarsWithMakerIcons(cached.data.cars);
+      renderCarGrid('home-car-grid', enrichedCached);
+      return;
+    }
+    await loadHomeCars();
     return;
   }
-  await loadHomeCars();
-  return;
-}
 
   // その他タブは従来通り
   if (tabId === 'search') {
-    executeSearch();
+    executeSearch(false); // ★ URLの二重更新を防ぐため false
   } else if (tabId === 'makers') {
     loadMakers();
   } else if (tabId === 'ranking') {
@@ -4022,6 +4024,12 @@ closeModal = function(id) {
   // ユーザー名・Twitterモーダルが閉じられたときにチェック
   if (id === 'username-modal' || id === 'twitter-modal') {
     checkAndShowAnnouncements();
+  }
+  // ★ 車両詳細を閉じたらURLを元のタブに戻す
+  if (id === 'detail-modal') {
+    const lastTab = window._lastTabBeforeDetail || 'home';
+    updateUrlForTab(lastTab, false);
+    window._lastTabBeforeDetail = null;
   }
 };
     // Google認証
@@ -4603,17 +4611,16 @@ switchTab = function(tabId) {
 let currentSearchResults = [];
 let currentSort = 'new';
 
-// executeSearch 関数を修正
-async function executeSearch() {
+async function executeSearch(push = true) {
   const keyword = document.getElementById('search-keyword').value;
   const genre = document.getElementById('search-genre').value;
   const filter = { keyword: keyword, genre: genre };
   if (currentSelectedMakerId) {
     filter.makerId = currentSelectedMakerId;
   }
-const result = await callGasApi('getCars', filter);
-const cars = result.cars || [];   // 配列を抽出
-const enrichedCars = await enrichCarsWithMakerIcons(cars);
+  const result = await callGasApi('getCars', filter);
+  const cars = result.cars || [];   // 配列を抽出
+  const enrichedCars = await enrichCarsWithMakerIcons(cars);
 
   const grid = document.getElementById('search-car-grid');
   
@@ -4630,6 +4637,9 @@ const enrichedCars = await enrichCarsWithMakerIcons(cars);
   currentSearchResults = enrichedCars;
   currentSort = document.getElementById('search-sort').value;
   applySortAndRender();
+
+  // ★ URLを更新
+  if (push) updateUrlForSearch(true);
 }
 // お問い合わせボタンの処理（将来Googleフォームに変更予定）
 function openContact() {
@@ -4732,6 +4742,7 @@ function filterByMaker(makerId, makerName) {
 document.getElementById('search-sort').addEventListener('change', function() {
   currentSort = this.value;
   applySortAndRender();
+  updateUrlForSearch(false); // ★ ソート変更は履歴を増やさずURLを書き換え
 });
 
     async function loadRanking() {
@@ -4971,7 +4982,10 @@ ${showRank ? `<p style="font-size:0.9rem; color:#ffd700;">販売台数: ${c.sale
   // 車両詳細を開く（カルーセル＋項目画像対応）
 let viewedCarIds = {}; // セッション中のカウント済み車両IDを保持
 
-async function openCarDetail(carId) {
+async function openCarDetail(carId, push = true) {
+  if (push) {
+    window._lastTabBeforeDetail = document.querySelector('.tab-content.active')?.id || 'home';
+  }
   const car = await callGasApi('getCarDetail', { carId: carId });
   if (!car) return;
   currentCarDetail = car;
@@ -5080,6 +5094,9 @@ async function openCarDetail(carId) {
       }, 50);
 
       document.getElementById('detail-modal').style.display = 'flex';
+
+      // ★ URLを車詳細に更新
+      if (push) updateUrlForCar(carId, true);
     }
 
    function calculateTotalPrice() {
@@ -6855,29 +6872,105 @@ function startCooldown(seconds) {
   }, 1000);
 }
     
-function checkUrlForCar() {
+// ============================================================
+// URL同期ヘルパー
+// ============================================================
+function buildUrl(params) {
+  const url = new URL(window.location.href);
+  url.search = '';
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined && value !== '') {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.pathname + url.search;
+}
+
+function updateUrlForTab(tabId, push = true) {
+  const params = { tab: tabId };
+  if (tabId === 'search') {
+    const keyword = document.getElementById('search-keyword').value.trim();
+    const genre = document.getElementById('search-genre').value;
+    const sort = document.getElementById('search-sort').value;
+    if (currentSelectedMakerId) params.makerId = currentSelectedMakerId;
+    if (keyword) params.keyword = keyword;
+    if (genre && genre !== 'all') params.genre = genre;
+    if (sort && sort !== 'new') params.sort = sort;
+  }
+  const newUrl = buildUrl(params);
+  if (push) history.pushState({ tab: tabId }, '', newUrl);
+  else history.replaceState({ tab: tabId }, '', newUrl);
+}
+
+function updateUrlForSearch(push = true) {
+  const keyword = document.getElementById('search-keyword').value.trim();
+  const genre = document.getElementById('search-genre').value;
+  const sort = document.getElementById('search-sort').value;
+  const params = { tab: 'search' };
+  if (currentSelectedMakerId) params.makerId = currentSelectedMakerId;
+  if (keyword) params.keyword = keyword;
+  if (genre && genre !== 'all') params.genre = genre;
+  if (sort && sort !== 'new') params.sort = sort;
+  const newUrl = buildUrl(params);
+  if (push) history.pushState({ tab: 'search' }, '', newUrl);
+  else history.replaceState({ tab: 'search' }, '', newUrl);
+}
+
+function updateUrlForCar(carId, push = true) {
+  const params = { car: carId };
+  const newUrl = buildUrl(params);
+  if (push) history.pushState({ car: carId }, '', newUrl);
+  else history.replaceState({ car: carId }, '', newUrl);
+}
+
+function initFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const carId = params.get('car');
-  if (carId) {
-    // showLoading は呼ばない（openCarDetail 内で管理）
-    setTimeout(() => {
-      openCarDetail(carId).finally(() => {
-        // 成功・失敗にかかわらず URL からパラメータを除去
-        if (window.history && window.history.replaceState) {
-          const newUrl = window.location.origin + window.location.pathname;
-          window.history.replaceState({}, '', newUrl);
-        }
-      });
-    }, 0);
+  const tab = params.get('tab') || 'home';
+  const car = params.get('car');
+
+  if (car) {
+    switchTab('home', false);
+    openCarDetail(car, false);
+  } else {
+    switchTab(tab, false);
+    if (tab === 'search') {
+      const keyword = params.get('keyword') || '';
+      const genre = params.get('genre') || 'all';
+      const sort = params.get('sort') || 'new';
+      const makerId = params.get('makerId');
+      if (makerId) {
+        currentSelectedMakerId = makerId;
+        document.getElementById('reset-search-btn').style.display = 'inline-block';
+        callGasApi('getMakers', {}, false).then(makers => {
+          const m = makers?.find(x => x.makerId === makerId);
+          document.getElementById('search-title').innerText = m ? `「${m.makerName}」の車両一覧` : 'メーカー指定検索';
+        }).catch(() => {
+          document.getElementById('search-title').innerText = 'メーカー指定検索';
+        });
+      } else {
+        currentSelectedMakerId = null;
+        document.getElementById('reset-search-btn').style.display = 'none';
+        document.getElementById('search-title').innerText = '架空車 総合検索';
+      }
+      document.getElementById('search-keyword').value = keyword;
+      document.getElementById('search-genre').value = genre;
+      document.getElementById('search-sort').value = sort;
+      executeSearch(false);
+    }
   }
 }
+
+window.addEventListener('popstate', function() {
+  initFromUrl();
+});
+
 // loadHomeCars 完了後に URL チェックを実行する（上書き）
 const originalLoadHomeCars = loadHomeCars;
 loadHomeCars = async function(force = false) {
   await originalLoadHomeCars(force);
   if (!window._urlChecked) {
     window._urlChecked = true;
-    checkUrlForCar();
+    initFromUrl();
   }
 };
 
