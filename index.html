@@ -3445,16 +3445,25 @@ onAuthStateChanged(auth, async (user) => {
     // ★ ここで初めて車両をロード
     window.triggerInitialLoad && window.triggerInitialLoad();
 
-    const userInfo = await callGasApi('registerUser', {
-      uid: user.uid,
-      name: '',
-      username: '',
-      email: user.email,
-      _t: Date.now()
-    }, true, true);
+    // ★ try-catch で囲み、userInfo が null でも落ちないようにする
+    let userInfo = null;
+    try {
+      userInfo = await callGasApi('registerUser', {
+        uid: user.uid,
+        name: '',
+        username: '',
+        email: user.email,
+        _t: Date.now()
+      }, true, true);
+    } catch (e) {
+      console.error('registerUser 失敗:', e);
+    }
 
-    // ★ ユーザー名のチェック（モーダル表示のみ）
-    if (userInfo && userInfo.name === '') {
+    // ★ userInfo が null の場合は Firebase の情報でフォールバック
+    if (!userInfo) {
+      console.warn('ユーザー情報の取得に失敗したため、Firebaseの情報で表示します');
+      document.getElementById('user-display-name').innerText = user.displayName || user.email || 'ユーザー';
+    } else if (userInfo.name === '') {
       showUsernameModal(user.uid);
     } else {
       document.getElementById('user-display-name').innerText = userInfo.name || user.displayName || user.email;
@@ -3469,10 +3478,11 @@ onAuthStateChanged(auth, async (user) => {
   
 
     // ★ Twitter ID のチェック（モーダル表示のみ）
+    // ★ userInfo が null の場合はモーダルを出さずスキップ（後で登録できるように）
     const twitterId = userInfo?.twitterId || '';
-    if (!twitterId) {
+    if (userInfo && !twitterId) {
       showTwitterModal();
-    } else {
+    } else if (twitterId) {
       window.currentUser.twitterId = twitterId;
     }
 
