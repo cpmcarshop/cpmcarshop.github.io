@@ -166,7 +166,7 @@ function renderDealBoardLogs(logs, append) {
       <div class="deal-bubble ${isOwn ? 'own' : 'other'}" data-log-id="${log.logId}" style="display:flex; justify-content:${isOwn ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
         <div style="max-width:70%; background:${bg}; color:${color}; padding:8px 12px; border-radius:12px; word-break:break-word;">
           <div style="font-size:0.7rem; opacity:0.7;">${roleLabel}</div>
-          <div style="white-space:pre-wrap;">${log.content}</div>
+          <div style="white-space:pre-wrap;">${esc(log.content)}</div>
           <div style="font-size:0.7rem; opacity:0.7; text-align:right; margin-top:4px;">${formatDealTime(log.createdAt)}</div>
         </div>
       </div>
@@ -3495,7 +3495,15 @@ onAuthStateChanged(auth, async (user) => {
 </script>
 
   <script>
- var GAS_URL = "https://kakuusha-gai.paapaapaa810.workers.dev";
+// ★追加：HTMLエスケープ関数（XSS対策）
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
+}
+
+var GAS_URL = "https://kakuusha-gai.paapaapaa810.workers.dev";
 
 // ★ 起動時からローディングを表示（BANチェック完了まで隠さない）
 window._bootLoadingActive = true;
@@ -3659,12 +3667,12 @@ async function showMyOrders() {
     const optionsDisplay = Array.isArray(o.options) ? o.options.join(', ') : 'なし';
     return `
       <div class="notif-box">
-        <strong>${o.carName}</strong><br>
-        注文ID: ${o.orderId}<br>
-        グレード: ${o.gradeName} | カラー: ${o.colorName} | オプション: ${optionsDisplay}<br>
+        <strong>${esc(o.carName)}</strong><br>
+        注文ID: ${esc(o.orderId)}<br>
+        グレード: ${esc(o.gradeName)} | カラー: ${esc(o.colorName)} | オプション: ${esc(optionsDisplay)}<br>
         合計金額: ${Number(o.totalPrice).toLocaleString()} CR<br>
-        ステータス: <strong>${o.status}</strong><br>
-       注文日: ${o.createdAt}
+        ステータス: <strong>${esc(o.status)}</strong><br>
+       注文日: ${esc(o.createdAt)}
       <br><button class="btn btn-secondary" style="margin-top:5px;" onclick="openDealBoard('${o.orderId}')">📋 取引ボード${o.status === '納車完了' ? '（完了）' : ''}</button>
       </div>
     `;
@@ -3789,8 +3797,6 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     return apiCache[cacheKey].data;
   }
 
-  // ★ 変更: abort をやめて「実行中はスキップ」（abortでGASが無駄実行されるのを防止）
-  // ★ 変更: abort をやめて「実行中はスキップ」（abortでGASが無駄実行されるのを防止）
   if (currentAbortControllers[action]) {
     console.log(`⏸ 実行中のためスキップ: ${action}`);
     return null;
@@ -3803,12 +3809,19 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     showLoading("サーバーと通信中...");
   }
 
-  // ★ 全アクションで最大3回リトライ
-  // ★ 全アクションで最大3回リトライ
+  // ★★★ 修正: 認証トークンの取得 ★★★
+  let headers = { 'Content-Type': 'text/plain' };
+  if (window.currentUser) {
+    try {
+      const token = await window.currentUser.getIdToken();
+      headers['Authorization'] = 'Bearer ' + token;
+    } catch (e) {
+      console.warn('認証トークン取得失敗:', e);
+    }
+  }
+
   const MAX_RETRY = 3;
   const BASE_DELAY = 800;
-
-  // ★ 追加: 計測用タイマー開始
   const pingStart = performance.now();
 
   try {
@@ -3816,7 +3829,7 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
       try {
         const res = await fetch(GAS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: headers, // ★修正: 取得したヘッダーを使用
           body: JSON.stringify({ action, payload }),
           signal
         });
@@ -3826,11 +3839,8 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
         }
 
         const text = await res.text();
-
-        // ★ 追加: 成功時に計測値を記録
         recordGasPing(action, Math.round(performance.now() - pingStart), false);
 
-        // ★ 非JSONレスポンスを分類
         if (!text.trim().startsWith('{')) {
           const isRetryable =
             text.includes('同時に実行中のスクリプト') ||
@@ -3861,7 +3871,6 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
           throw new Error('サーバー応答の解析に失敗しました。');
         }
 
-        // BAN検知
         if (result && result.banned) {
           for (let key in apiCache) { delete apiCache[key]; }
           let url = GAS_URL + '?page=goodbye';
@@ -3872,7 +3881,6 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
           return null;
         }
 
-        // ★ retryable フラグを尊重
         if (!result.success) {
           if (result.retryable && attempt < MAX_RETRY) {
             const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 1000;
@@ -3883,10 +3891,7 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
           throw new Error(result.error || 'API呼び出しに失敗しました');
         }
 
-        apiCache[cacheKey] = {
-          data: result.data,
-          timestamp: now
-        };
+        apiCache[cacheKey] = { data: result.data, timestamp: now };
         return result.data;
 
       } catch (e) {
@@ -3909,9 +3914,7 @@ async function callGasApi(action, payload = {}, showLoadingFlag = true, forceRef
     }
     return null;
   } finally {
-    if (showLoadingFlag) {
-      hideLoading();
-    }
+    if (showLoadingFlag) hideLoading();
     if (currentAbortControllers[action] === controller) {
       delete currentAbortControllers[action];
     }
@@ -4758,25 +4761,19 @@ const enrichedCars = await enrichCarsWithMakerIcons(cars);
     const iconUrl = m.iconUrl || 'https://placehold.co/44x44?text=M';
 
 return `
-  <div class="card" style="cursor:pointer;" onclick="filterByMaker('${m.makerId}', '${m.makerName}')">
-    <!-- ★ ヘッダー画像とアイコンをラップ -->
+  <div class="card" style="cursor:pointer;" onclick="filterByMaker('${esc(m.makerId)}', '${esc(m.makerName)}')">
     <div style="position: relative;">
-      <img src="${addRwParam(m.headerUrl) || 'https://placehold.co/300x100?text=No+Header'}" 
-           class="card-img" style="height:100px; display:block; background:#000;">
-      <!-- ★ メーカーアイコン（左上に重ねる） -->
-      <img src="${addRwParam(iconUrl)}" 
-           style="position: absolute; top: 8px; left: 8px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: #000; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 2;">
+      <img src="${esc(addRwParam(m.headerUrl)) || 'https://placehold.co/300x100?text=No+Header'}" class="card-img" style="height:100px; display:block; background:#000;">
+      <img src="${esc(addRwParam(iconUrl))}" style="position: absolute; top: 8px; left: 8px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: #000; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 2;">
     </div>
     <div class="card-body">
-      <h3 class="card-title">${m.makerName}</h3>
-      <p style="font-size:0.85rem; color:#aaa;">${m.description}</p>
-      ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${m.cpmId}</p>` : ''}
+      <h3 class="card-title">${esc(m.makerName)}</h3>
+      <p style="font-size:0.85rem; color:#aaa;">${esc(m.description)}</p>
+      ${m.cpmId ? `<p style="font-size:0.85rem; color:var(--main-color);">CPM ID: ${esc(m.cpmId)}</p>` : ''}
 
-          
-          <!-- ★ 修正: イベントバブリングを停止 -->
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
-            ${twitterUrl ? `<a href="${twitterUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#1DA1F2; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🐦 Twitter</a>` : ''}
-            ${homepageUrl ? `<a href="${homepageUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#4CAF50; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🌐 ホームページ</a>` : ''}
+            ${twitterUrl ? `<a href="${esc(twitterUrl)}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#1DA1F2; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🐦 Twitter</a>` : ''}
+            ${homepageUrl ? `<a href="${esc(homepageUrl)}" target="_blank" rel="noopener noreferrer" class="btn" style="background:#4CAF50; color:#fff; padding:4px 12px; font-size:0.8rem; text-decoration:none;" onclick="event.stopPropagation();">🌐 ホームページ</a>` : ''}
           </div>
 
           <button class="btn" style="width:100%; margin-top:5px;">このメーカーの車両を見る</button>
@@ -4823,19 +4820,17 @@ const isDimmed = c.status === '受注停止' || c.status === '完売';
 return `
   <div class="card${isDimmed ? ' card-dimmed' : ''}">
     ${rankBadge}${couponBadge}
-    <span class="card-badge">${c.status}</span>
+    <span class="card-badge">${esc(c.status)}</span>
     
-    <!-- ★ 画像とアイコンをラップ -->
     <div style="position: relative;">
-      <img src="${addRwParam(c.img1) || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${c.carName}">
-      <img src="${addRwParam(iconUrl)}" 
-           style="position: absolute; bottom: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; background: #000; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 2;">
+      <img src="${esc(addRwParam(c.img1)) || 'https://placehold.co/300x160?text=No+Image'}" class="card-img" alt="${esc(c.carName)}">
+      <img src="${esc(addRwParam(iconUrl))}" style="position: absolute; bottom: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; background: #000; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.6); z-index: 2;">
     </div>
 
     <div class="card-body">
-          <div class="card-subtitle">${c.makerName}</div>
-          <h3 class="card-title">${c.carName}</h3>
-          <p style="font-size:0.85rem; color:#888;">${c.genre} | ${c.productionType}</p>
+          <div class="card-subtitle">${esc(c.makerName)}</div>
+          <h3 class="card-title">${esc(c.carName)}</h3>
+          <p style="font-size:0.85rem; color:#888;">${esc(c.genre)} | ${esc(c.productionType)}</p>
           ${priceDisplay}
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
           <span style="font-size:0.85rem; color:${c.status === '販売中' ? '#4caf50' : c.status === '受注停止' ? '#ff9800' : '#f44336'}; font-weight:bold;">
@@ -4978,21 +4973,19 @@ async function openCarDetail(carId) {
   carouselImages = [car.img1, car.img2, car.img3, car.img4].filter(Boolean);
   carouselIndex = 0;
 
-  const body = document.getElementById('detail-modal-body');
+   const body = document.getElementById('detail-modal-body');
   body.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-  <!-- ★ 左側：アイコン + 車名・メーカー名 -->
   <div style="display: flex; align-items: center; gap: 12px;">
-    <img src="${addRwParam(iconUrl)}" 
-         style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--main-color); background: #000;">
+    <img src="${esc(addRwParam(iconUrl))}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--main-color); background: #000;">
     <div>
-      <h2 style="margin:0;">${car.carName}</h2>
-      <p style="color:var(--main-color); margin:5px 0;">${car.maker ? car.maker.makerName : ''}</p>
+      <h2 style="margin:0;">${esc(car.carName)}</h2>
+      <p style="color:var(--main-color); margin:5px 0;">${esc(car.maker ? car.maker.makerName : '')}</p>
     </div>
   </div>
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
     <span style="font-size:0.9rem; color:${car.status === '販売中' ? '#4caf50' : car.status === '受注停止' ? '#ff9800' : '#f44336'}; font-weight:bold;">
-      ${car.status}
+      ${esc(car.status)}
     </span>
     <button class="btn btn-secondary" onclick="shareCarLink('${car.carId}', '${car.carName}')" style="font-size:0.85rem; padding:6px 14px;">
       📤 共有
@@ -5011,10 +5004,10 @@ async function openCarDetail(carId) {
           <div class="carousel-dots"></div>
         </div>
 
-        <p style="white-space: pre-wrap;">${car.description}</p>
+        <p style="white-space: pre-wrap;">${esc(car.description)}</p>
 
          <!-- ★★★ ここにリンク表示を追加 ★★★ -->
-  ${car.link ? `<p><a href="${car.link}" target="_blank" rel="noopener" style="color:var(--main-color); text-decoration:underline;">関連リンク</a></p>` : ''}
+  ${car.link ? `<p><a href="${esc(car.link)}" target="_blank" rel="noopener" style="color:var(--main-color); text-decoration:underline;">関連リンク</a></p>` : ''}
 
 
         <h4>1. グレード選択</h4>
@@ -6316,10 +6309,10 @@ async function loadMyCoupons(maker) {
   container.innerHTML = coupons.map(c => `
     <div class="notif-box" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
       <div>
-        <strong>${c.code}</strong> - ${c.description}<br>
-        ${c.discountType === 'fixed' ? c.discountValue + 'CR OFF' : c.discountValue + '% OFF'}
-        ${c.minOrderAmount > 0 ? `（最小注文額: ${c.minOrderAmount}CR）` : ''}
-        <br>有効期間: ${c.startDate} 〜 ${c.endDate}
+        <strong>${esc(c.code)}</strong> - ${esc(c.description)}<br>
+        ${c.discountType === 'fixed' ? Number(c.discountValue) + 'CR OFF' : Number(c.discountValue) + '% OFF'}
+        ${c.minOrderAmount > 0 ? `（最小注文額: ${Number(c.minOrderAmount)}CR）` : ''}
+        <br>有効期間: ${esc(c.startDate)} 〜 ${esc(c.endDate)}
         <span style="color:${c.isActive ? '#4caf50' : '#f44336'};">${c.isActive ? '有効' : '無効'}</span>
       </div>
       <div style="display:flex; gap:5px;">
