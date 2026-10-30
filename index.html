@@ -4598,9 +4598,10 @@ document.addEventListener('click', function(e) {
 });
 
 // タブ切り替え時にメニューを閉じる（スマホで自動クローズ）
+// タブ切り替え時にメニューを閉じる（スマホで自動クローズ）
 const originalSwitchTab = switchTab;
-switchTab = function(tabId) {
-  originalSwitchTab(tabId);
+switchTab = function(tabId, push = true) {
+  originalSwitchTab(tabId, push);   // ★ push を渡す
   const menu = document.getElementById('tabMenu');
   if (window.innerWidth <= 768) {
     menu.classList.remove('open');
