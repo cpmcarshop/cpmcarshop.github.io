@@ -584,7 +584,9 @@ header h1 { margin: 0; font-size: 1.6rem; color: #fff; letter-spacing: 2px; }
   overflow-y: auto;
 
   opacity: 0;
-  transition: opacity 180ms ease, display 180ms allow-discrete;
+  /* ★ フェード時間を少し長く（180→220ms）＋ transition-behavior を明示 */
+  transition: opacity 220ms ease, display 220ms allow-discrete;
+  transition-behavior: allow-discrete;
 }
 
 .modal[style*="display: flex"],
@@ -7212,6 +7214,39 @@ window._bannedCheckInProgress = true;
   document.addEventListener('DOMContentLoaded', function () {
     observer.observe(document.body, { childList: true, subtree: true });
   });
+})();
+// ============================================================
+// ★ モーダルを開いたときにスクロール位置をリセット
+// ============================================================
+(function() {
+  const modalObserver = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      if (m.attributeName !== 'style') return;
+      const el = m.target;
+      if (!el.classList || !el.classList.contains('modal')) return;
+
+      // ★ display: flex になった瞬間 = モーダルが開かれた
+      if (el.style.display === 'flex') {
+        // モーダル全体のスクロール位置
+        el.scrollTop = 0;
+        // モーダルコンテンツ部分のスクロール位置
+        const content = el.querySelector('.modal-content');
+        if (content) content.scrollTop = 0;
+      }
+    });
+  });
+
+  function observeAllModals() {
+    document.querySelectorAll('.modal').forEach(el => {
+      modalObserver.observe(el, { attributes: true, attributeFilter: ['style'] });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', observeAllModals);
+  } else {
+    observeAllModals();
+  }
 })();
   </script>
 
