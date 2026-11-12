@@ -5,129 +5,142 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>404 - ページが見つかりません | 架空車街</title>
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   body {
     background: #0a0c1b;
     color: #e0e0e0;
     font-family: -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    min-height: 100vh;
     position: relative;
-    overflow: hidden;
   }
 
-  /* 背景のネオン装飾 */
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background:
       radial-gradient(ellipse at 20% 20%, rgba(0, 210, 255, 0.08) 0%, transparent 50%),
       radial-gradient(ellipse at 80% 80%, rgba(233, 69, 96, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
-
-  /* 走る光のライン（道路っぽい演出） */
   body::after {
     content: '';
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 18%;
+    position: fixed; left: 0; right: 0; bottom: 18%;
     height: 2px;
     background: linear-gradient(90deg, transparent, #00d2ff, transparent);
     opacity: 0.35;
     animation: roadGlow 4s ease-in-out infinite alternate;
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
   @keyframes roadGlow {
-    0%   { opacity: 0.15; transform: scaleX(0.6); }
+    0% { opacity: 0.15; transform: scaleX(0.6); }
     100% { opacity: 0.45; transform: scaleX(1); }
   }
 
-  .wrap {
-    position: relative;
-    z-index: 1;
-    max-width: 560px;
-    width: 100%;
-    text-align: center;
+  .wheel {
+    position: fixed; width: 260px; height: 260px;
+    border: 2px dashed rgba(0, 210, 255, 0.08);
+    border-radius: 50%; pointer-events: none; z-index: 0;
+    animation: spin 60s linear infinite;
+  }
+  .wheel.w1 { top: -100px; left: -100px; }
+  .wheel.w2 { bottom: -100px; right: -100px; animation-direction: reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .scene {
+    position: fixed; inset: 0; z-index: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; padding: 80px 24px 100px;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
   }
 
-  /* 404 の巨大数字 */
+  .phys-item {
+    will-change: transform;
+    cursor: grab;
+    transform-origin: center center;
+    max-width: 100%;
+  }
+  .phys-item:active { cursor: grabbing; }
+  .phys-item.frozen {
+    position: absolute;
+    left: 0; top: 0;
+  }
+
   .code {
-    font-size: clamp(6rem, 22vw, 11rem);
-    font-weight: 900;
-    line-height: 0.9;
-    letter-spacing: -4px;
-    margin: 0 0 8px;
+    font-size: clamp(5rem, 20vw, 9rem);
+    font-weight: 900; line-height: 0.9; letter-spacing: -4px;
+    margin: 0;
     color: transparent;
     background: linear-gradient(135deg, #00d2ff 0%, #4fd8ff 40%, #e94560 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
+    -webkit-background-clip: text; background-clip: text;
     text-shadow: 0 0 60px rgba(0, 210, 255, 0.35);
+    text-align: center;
+    display: inline-block; padding: 0 10px;
   }
 
   .title {
     font-size: clamp(1.2rem, 4vw, 1.6rem);
-    font-weight: 700;
-    color: #ffffff;
-    margin: 0 0 12px;
-    letter-spacing: 1px;
+    font-weight: 700; color: #ffffff;
+    margin: 0; letter-spacing: 1px; text-align: center;
+    padding: 6px 16px;
+    background: rgba(10, 12, 27, 0.75);
+    border-radius: 8px;
   }
 
   .desc {
-    font-size: 0.95rem;
-    color: #a0a0ab;
-    line-height: 1.9;
-    margin: 0 0 32px;
+    font-size: 0.9rem; color: #a0a0ab;
+    line-height: 1.8; margin: 0; text-align: center;
+    padding: 8px 18px;
+    background: rgba(10, 12, 27, 0.75);
+    border-radius: 8px;
   }
 
   .path {
     display: inline-block;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(10, 12, 27, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
     padding: 6px 14px;
-    font-size: 0.8rem;
-    color: #888;
+    font-size: 0.75rem; color: #888;
     font-family: 'SF Mono', Consolas, monospace;
-    margin-bottom: 28px;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
-  .actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 40px;
+  .brand {
+    font-size: 0.75rem; color: #666;
+    letter-spacing: 2px; line-height: 1.8; text-align: center;
+    padding: 8px 18px;
+    background: rgba(10, 12, 27, 0.75);
+    border-radius: 8px;
+  }
+  .brand strong {
+    display: block; color: #00d2ff; font-size: 0.85rem;
+    letter-spacing: 3px; margin-bottom: 4px;
+  }
+
+  .fixed-actions {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    pointer-events: auto;
   }
 
   .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    display: inline-flex; align-items: center; gap: 8px;
     padding: 14px 28px;
-    background: #00d2ff;
-    color: #000;
-    text-decoration: none;
-    font-weight: 700;
-    font-size: 0.95rem;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
+    background: #00d2ff; color: #000;
+    text-decoration: none; font-weight: 700; font-size: 0.95rem;
+    border-radius: 6px; border: none; cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+    font-family: inherit; white-space: nowrap;
   }
   .btn:hover {
     background: #4fd8ff;
@@ -135,88 +148,377 @@
     box-shadow: 0 0 30px rgba(0, 210, 255, 0.5);
   }
 
-  .btn-secondary {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e0e0e0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: none;
+  #secret-toast {
+    position: fixed; bottom: 90px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(22, 33, 62, 0.95);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #00d2ff; color: #fff;
+    padding: 14px 24px; border-radius: 10px;
+    z-index: 2000; font-weight: 700; font-size: 0.9rem;
+    box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+    max-width: 90%; text-align: center; pointer-events: none;
+    opacity: 0;
   }
-  .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.25);
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
-  }
-
-  /* ブランド表記 */
-  .brand {
-    font-size: 0.75rem;
-    color: #555;
-    letter-spacing: 2px;
-    line-height: 1.8;
-  }
-  .brand strong {
-    display: block;
-    color: #00d2ff;
-    font-size: 0.85rem;
-    letter-spacing: 3px;
-    margin-bottom: 4px;
+  #secret-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
   }
 
-  /* 装飾：車輪っぽい円 */
-  .wheel {
-    position: fixed;
-    width: 260px;
-    height: 260px;
-    border: 2px dashed rgba(0, 210, 255, 0.08);
-    border-radius: 50%;
+  .rainbow-mode .phys-item {
+    animation: rainbowHue 3s linear infinite;
+  }
+  @keyframes rainbowHue {
+    0% { filter: hue-rotate(0deg) drop-shadow(0 0 30px rgba(255,255,255,0.3)); }
+    100% { filter: hue-rotate(360deg) drop-shadow(0 0 30px rgba(255,255,255,0.3)); }
+  }
+
+  #secret-text {
+    position: absolute; display: none; z-index: 50;
     pointer-events: none;
-    z-index: 0;
-    animation: spin 60s linear infinite;
+    left: 50%; top: 15%;
+    transform: translateX(-50%);
   }
-  .wheel.w1 { top: -100px; left: -100px; }
-  .wheel.w2 { bottom: -100px; right: -100px; animation-direction: reverse; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  #secret-text.show {
+    display: block;
+    animation: secretIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes secretIn {
+    0% { opacity: 0; transform: translateX(-50%) scale(0.3) rotate(-15deg); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0deg); }
+  }
+  #secret-text .msg {
+    background: linear-gradient(135deg, #ffd700, #ff6b6b, #00d2ff);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    font-size: 1.3rem; font-weight: 900; letter-spacing: 3px;
+    padding: 12px 24px; text-align: center;
+    animation: gradientShift 3s ease infinite;
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+    white-space: nowrap;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 
   @media (max-width: 480px) {
-    .actions { flex-direction: column; }
-    .btn { width: 100%; justify-content: center; }
+    .btn { padding: 10px 20px; font-size: 0.85rem; }
+    .scene { padding: 60px 16px 90px; gap: 10px; }
   }
 </style>
 </head>
 <body>
+  <div class="wheel w1"></div>
+  <div class="wheel w2"></div>
 
-<div class="wheel w1"></div>
-<div class="wheel w2"></div>
+  <div class="scene" id="scene">
+    <div class="phys-item" data-phys="code"><h1 class="code">404</h1></div>
+    <div class="phys-item" data-phys="title"><h2 class="title">このページは存在しません</h2></div>
+    <div class="phys-item" data-phys="desc"><p class="desc">お探しのページは、削除されたか、<br>URLの変更、または打ち間違えの可能性があります。</p></div>
+    <div class="phys-item" data-phys="path"><div class="path" id="current-path"></div></div>
+    <div class="phys-item" data-phys="brand"><div class="brand"><strong>架空車街</strong>PRODUCED BY MPEK Group</div></div>
+    <div id="secret-text"><div class="msg">✦ 隠しイベント発動 ✦</div></div>
+  </div>
 
-<div class="wrap">
-  <h1 class="code">404</h1>
-  <h2 class="title">このページは存在しません</h2>
-  <p class="desc">
-    お探しのページは、削除されたか、<br>
-    URLの変更、または打ち間違えの可能性があります。
-  </p>
-  <div class="path" id="current-path"></div>
-
-  <div class="actions">
+  <div class="fixed-actions">
     <a href="https://cpmcarshop.github.io/" class="btn">🏠 架空車街トップへ</a>
- \
   </div>
 
-  <div class="brand">
-    <strong>架空車街</strong>
-    PRODUCED BY MPEK Group
-  </div>
-</div>
+  <div id="secret-toast"></div>
 
-<script>
-  // アクセスされたパスを表示（長すぎる場合は省略）
+  <script>
   (function() {
-    var el = document.getElementById('current-path');
-    if (!el) return;
-    var path = location.pathname + location.search + location.hash;
-    el.textContent = path;
-    el.title = path;
+    /* ---------- パス表示 ---------- */
+    var pathEl = document.getElementById('current-path');
+    if (pathEl) {
+      var path = location.pathname + location.search + location.hash;
+      pathEl.textContent = path;
+      pathEl.title = path;
+    }
+
+    window.addEventListener('load', initPhysics);
+
+    function initPhysics() {
+      if (typeof Matter === 'undefined') {
+        console.error('Matter.js not loaded');
+        return;
+      }
+
+      var Engine = Matter.Engine,
+          Runner = Matter.Runner,
+          Bodies = Matter.Bodies,
+          Body = Matter.Body,
+          Composite = Matter.Composite,
+          Mouse = Matter.Mouse,
+          MouseConstraint = Matter.MouseConstraint,
+          Events = Matter.Events;
+
+      var scene = document.getElementById('scene');
+      var physEls = Array.prototype.slice.call(scene.querySelectorAll('.phys-item'));
+      var secretEl = document.getElementById('secret-text');
+      var secretToast = document.getElementById('secret-toast');
+
+      /* =========================================================
+         1. レイアウト時の位置を計測
+         ========================================================= */
+      var sceneRect = scene.getBoundingClientRect();
+      var items = physEls.map(function(el) {
+        var r = el.getBoundingClientRect();
+        return {
+          el: el,
+          cx: r.left - sceneRect.left + r.width / 2,
+          cy: r.top - sceneRect.top + r.height / 2,
+          w: r.width,
+          h: r.height
+        };
+      });
+
+      /* =========================================================
+         2. 物理が動き出すまで、その場に完全固定
+            （＝ 触られるまでは普通の404ページ）
+         ========================================================= */
+      items.forEach(function(item) {
+        item.el.classList.add('frozen');
+        item.el.style.width = item.w + 'px';
+        item.el.style.height = item.h + 'px';
+        item.el.style.transform =
+          'translate(' + (item.cx - item.w / 2) + 'px, ' + (item.cy - item.h / 2) + 'px)';
+      });
+
+      /* =========================================================
+         3. 物理エンジン（この時点ではまだ回さない）
+         ========================================================= */
+      var engine = Engine.create();
+      engine.world.gravity.x = 0;
+      engine.world.gravity.y = 0.02; // ほぼ無重力の浮遊感
+
+      /* =========================================================
+         4. ボディ生成（エンジンを回すまで動かない）
+         ========================================================= */
+      var bodies = items.map(function(item) {
+        var b = Bodies.rectangle(item.cx, item.cy, item.w, item.h, {
+          restitution: 0.85,
+          friction: 0.02,
+          frictionAir: 0.008,
+          density: 0.001
+        });
+        b.plugin = { el: item.el, w: item.w, h: item.h };
+        Composite.add(engine.world, b);
+        return b;
+      });
+
+      /* =========================================================
+         5. 画面外に出ないように壁を作る
+            （下側は「トップへ」ボタンの領域を避ける）
+         ========================================================= */
+      var WALL_T = 120;
+      var walls = [];
+      var bounds = null;
+
+      function calcBounds() {
+        var rect = scene.getBoundingClientRect();
+        var margin = 12;
+        var left = margin;
+        var top = margin;
+        var right = Math.max(left + 40, rect.width - margin);
+        var bottom = Math.max(top + 40, rect.height - margin);
+
+        var actions = document.querySelector('.fixed-actions');
+        if (actions) {
+          var ar = actions.getBoundingClientRect();
+          if (ar.height > 0) {
+            var limit = ar.top - rect.top - 12;
+            if (limit > top + 120) bottom = Math.min(bottom, limit);
+          }
+        }
+        return { left: left, top: top, right: right, bottom: bottom };
+      }
+
+      function createWalls(b) {
+        var w = b.right - b.left;
+        var h = b.bottom - b.top;
+        var cx = (b.left + b.right) / 2;
+        var cy = (b.top + b.bottom) / 2;
+        var opt = { isStatic: true, restitution: 0.9, friction: 0.1 };
+        return [
+          Bodies.rectangle(cx, b.top - WALL_T / 2, w + WALL_T * 2, WALL_T, opt),
+          Bodies.rectangle(cx, b.bottom + WALL_T / 2, w + WALL_T * 2, WALL_T, opt),
+          Bodies.rectangle(b.left - WALL_T / 2, cy, WALL_T, h + WALL_T * 2, opt),
+          Bodies.rectangle(b.right + WALL_T / 2, cy, WALL_T, h + WALL_T * 2, opt)
+        ];
+      }
+
+      function rebuildWalls() {
+        if (walls.length) Composite.remove(engine.world, walls);
+        bounds = calcBounds();
+        walls = createWalls(bounds);
+        Composite.add(engine.world, walls);
+      }
+
+      /* 壁をすり抜けた場合の最終防衛線 */
+      function clampBody(b) {
+        if (!bounds) return;
+        var hw = (b.bounds.max.x - b.bounds.min.x) / 2;
+        var hh = (b.bounds.max.y - b.bounds.min.y) / 2;
+        var minX = bounds.left + hw, maxX = bounds.right - hw;
+        var minY = bounds.top + hh, maxY = bounds.bottom - hh;
+        if (maxX < minX) { minX = maxX = (bounds.left + bounds.right) / 2; }
+        if (maxY < minY) { minY = maxY = (bounds.top + bounds.bottom) / 2; }
+
+        var x = Math.min(Math.max(b.position.x, minX), maxX);
+        var y = Math.min(Math.max(b.position.y, minY), maxY);
+        if (x !== b.position.x || y !== b.position.y) {
+          Body.setPosition(b, { x: x, y: y });
+        }
+      }
+
+      rebuildWalls();
+
+      /* =========================================================
+         6. 描画同期
+         ========================================================= */
+      function syncEl(b) {
+        var el = b.plugin.el;
+        var w = b.plugin.w;
+        var h = b.plugin.h;
+        el.style.transform =
+          'translate(' + (b.position.x - w / 2) + 'px, ' + (b.position.y - h / 2) + 'px) ' +
+          'rotate(' + b.angle + 'rad)';
+      }
+
+      /* =========================================================
+         7. マウス操作
+         ========================================================= */
+      var mouse = Mouse.create(scene);
+      var mc = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+          stiffness: 0.18,
+          damping: 0.08,
+          render: { visible: false }
+        }
+      });
+      Composite.add(engine.world, mc);
+
+      /* =========================================================
+         8. ユーザーが「掴んで動かした」瞬間に物理スタート
+         ========================================================= */
+      var runner = Runner.create();
+      var activated = false;
+
+      function activate() {
+        if (activated) return;
+        activated = true;
+
+        bodies.forEach(function(b) {
+          clampBody(b);
+          Body.setVelocity(b, {
+            x: (Math.random() - 0.5) * 2.5,
+            y: (Math.random() - 0.5) * 2.5
+          });
+          Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.04);
+        });
+
+        Runner.run(runner, engine);
+      }
+
+      var pressing = false;
+      var pressOnItem = false;
+      var pressX = 0;
+      var pressY = 0;
+
+      scene.addEventListener('pointerdown', function(e) {
+        if (activated) return;
+        pressing = true;
+        pressOnItem = !!(e.target && e.target.closest && e.target.closest('.phys-item'));
+        pressX = e.clientX;
+        pressY = e.clientY;
+      }, true);
+
+      window.addEventListener('pointermove', function(e) {
+        if (activated || !pressing || !pressOnItem) return;
+        var dx = e.clientX - pressX;
+        var dy = e.clientY - pressY;
+        // 4px 以上動いたら「ドラッグ」とみなして起動
+        if (dx * dx + dy * dy > 16) activate();
+      }, true);
+
+      function resetPress() {
+        pressing = false;
+        pressOnItem = false;
+      }
+      window.addEventListener('pointerup', resetPress, true);
+      window.addEventListener('pointercancel', resetPress, true);
+
+      /* =========================================================
+         9. 隠しイベント：5回ドラッグで発動
+         ========================================================= */
+      var dragCount = 0;
+      var secretTriggered = false;
+
+      Events.on(mc, 'startdrag', function() {
+        dragCount++;
+      });
+
+      Events.on(mc, 'enddrag', function() {
+        if (secretTriggered) return;
+        if (dragCount >= 5) triggerSecret();
+      });
+
+      function triggerSecret() {
+        secretTriggered = true;
+        document.body.classList.add('rainbow-mode');
+        secretEl.classList.add('show');
+
+        showToast('🌈 隠しイベント発動！全てのオブジェクトが虹色に！');
+
+        bodies.forEach(function(b) {
+          Body.applyForce(b, b.position, {
+            x: (Math.random() - 0.5) * 0.15,
+            y: -Math.random() * 0.15
+          });
+          Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.15);
+        });
+      }
+
+      function showToast(msg) {
+        secretToast.textContent = msg;
+        secretToast.classList.add('show');
+        setTimeout(function() {
+          secretToast.classList.remove('show');
+        }, 4000);
+      }
+
+      /* =========================================================
+         10. 毎フレームの同期（＋画面外セーフティ）
+         ========================================================= */
+      Events.on(engine, 'afterUpdate', function() {
+        bodies.forEach(function(b) {
+          clampBody(b);
+          syncEl(b);
+        });
+      });
+
+      /* =========================================================
+         11. リサイズ対応（壁の作り直し＋はみ出し補正）
+         ========================================================= */
+      var resizeTimer = null;
+      window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+          rebuildWalls();
+          bodies.forEach(function(b) {
+            clampBody(b);
+            syncEl(b);
+          });
+        }, 150);
+      });
+    }
   })();
-</script>
+  </script>
 </body>
 </html>
