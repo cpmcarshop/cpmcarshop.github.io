@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>404 - ページが見つかりません | 架空車街</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #0a0c1b;
+    color: #e0e0e0;
+    font-family: -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* 背景のネオン装飾 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(0, 210, 255, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(233, 69, 96, 0.06) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 走る光のライン（道路っぽい演出） */
+  body::after {
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 18%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+    opacity: 0.35;
+    animation: roadGlow 4s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes roadGlow {
+    0%   { opacity: 0.15; transform: scaleX(0.6); }
+    100% { opacity: 0.45; transform: scaleX(1); }
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 560px;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* 404 の巨大数字 */
+  .code {
+    font-size: clamp(6rem, 22vw, 11rem);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: -4px;
+    margin: 0 0 8px;
+    color: transparent;
+    background: linear-gradient(135deg, #00d2ff 0%, #4fd8ff 40%, #e94560 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: 0 0 60px rgba(0, 210, 255, 0.35);
+  }
+
+  .title {
+    font-size: clamp(1.2rem, 4vw, 1.6rem);
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 12px;
+    letter-spacing: 1px;
+  }
+
+  .desc {
+    font-size: 0.95rem;
+    color: #a0a0ab;
+    line-height: 1.9;
+    margin: 0 0 32px;
+  }
+
+  .path {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    color: #888;
+    font-family: 'SF Mono', Consolas, monospace;
+    margin-bottom: 28px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: #00d2ff;
+    color: #000;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+  }
+  .btn:hover {
+    background: #4fd8ff;
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(0, 210, 255, 0.5);
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
+  }
+
+  /* ブランド表記 */
+  .brand {
+    font-size: 0.75rem;
+    color: #555;
+    letter-spacing: 2px;
+    line-height: 1.8;
+  }
+  .brand strong {
+    display: block;
+    color: #00d2ff;
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+  }
+
+  /* 装飾：車輪っぽい円 */
+  .wheel {
+    position: fixed;
+    width: 260px;
+    height: 260px;
+    border: 2px dashed rgba(0, 210, 255, 0.08);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    animation: spin 60s linear infinite;
+  }
+  .wheel.w1 { top: -100px; left: -100px; }
+  .wheel.w2 { bottom: -100px; right: -100px; animation-direction: reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 480px) {
+    .actions { flex-direction: column; }
+    .btn { width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wheel w1"></div>
+<div class="wheel w2"></div>
+
+<div class="wrap">
+  <h1 class="code">404</h1>
+  <h2 class="title">このページは存在しません</h2>
+  <p class="desc">
+    お探しのページは、削除されたか、<br>
+    URLの変更、または打ち間違えの可能性があります。
+  </p>
+  <div class="path" id="current-path"></div>
+
+  <div class="actions">
+    <a href="https://cpmcarshop.github.io/" class="btn">🏠 架空車街トップへ</a>
+ \
+  </div>
+
+  <div class="brand">
+    <strong>架空車街</strong>
+    PRODUCED BY MPEK Group
+  </div>
+</div>
+
+<script>
+  // アクセスされたパスを表示（長すぎる場合は省略）
+  (function() {
+    var el = document.getElementById('current-path');
+    if (!el) return;
+    var path = location.pathname + location.search + location.hash;
+    el.textContent = path;
+    el.title = path;
+  })();
+</script>
+</body>
+</html>
